@@ -23,7 +23,7 @@ public class ImageConsumer {
         log.info("I am a Kafka Consumer!");
 
         String groupId = "my-java-application";
-        String topic = "initial";
+        String topic = "consumer1";
 
         // create Consumer Properties
         Properties properties = new Properties();
