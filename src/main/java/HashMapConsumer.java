@@ -1,4 +1,8 @@
 import com.fasterxml.jackson.databind.ObjectWriter;
+<<<<<<< HEAD
+=======
+import com.fasterxml.jackson.databind.ObjectMapper;
+>>>>>>> 55ad5c50687bf7b68a4bb73d1d78be3476da5cbb
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -61,7 +65,11 @@ public class HashMapConsumer {
                     try (ByteArrayInputStream bis = new ByteArrayInputStream(value);
                          ObjectInputStream ois = new ObjectInputStream(bis)) {
                         log.info("insideeeeeeeeeeeeeeeeeeeeeee");
+<<<<<<< HEAD
                         HashMap<String, Integer> deserializedUser = (HashMap<String, Integer>) ois.readObject();
+=======
+                        HashMap<String, Integer> deserializedUser = (HashMap<String,Integer>)ois.readObject();
+>>>>>>> 55ad5c50687bf7b68a4bb73d1d78be3476da5cbb
                         System.out.println(deserializedUser);
                         ObjectMapper mapper = new ObjectMapper();
                         try {
