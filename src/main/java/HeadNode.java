@@ -1,3 +1,5 @@
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -10,6 +12,10 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.ObjectOutputStream;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -18,16 +24,41 @@ import java.util.Properties;
 public class HeadNode {
 
     private static final String topicName[] = new String[]{
-            "consumer0",
-            "consumer1",
-            "consumer2"
+            "storage0",
+            "storage1",
+            "storage2",
+            "storage0_backup",
+            "storage1_backup",
+            "storage2_backup"
     };
 
     private static int counter = 0;
 
     private static final Logger log = LoggerFactory.getLogger(HeadNode.class.getSimpleName());
 
-    private static HashMap<String, Integer> location = new HashMap<>();
+    private static HashMap<String, Integer> locationMap = new HashMap<>();
+
+    public static byte[] hashMapToByteArray(HashMap<String, Integer> hashMap) {
+        try {
+            ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+            ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream);
+
+            // Serialize the HashMap to the ObjectOutputStream
+            objectOutputStream.writeObject(hashMap);
+
+            // Close the streams
+            objectOutputStream.close();
+            byteArrayOutputStream.close();
+
+            // Get the byte array from the ByteArrayOutputStream
+            return byteArrayOutputStream.toByteArray();
+        } catch (IOException e) {
+            e.printStackTrace();
+            // Handle the exception as needed
+        }
+
+        return null; // Return null if there was an error
+    }
 
     public static void main(String[] args) {
         log.info("I am the Head Node!");
@@ -62,6 +93,7 @@ public class HeadNode {
                 for (ConsumerRecord<String, byte[]> record : records) {
                     log.info("Received message: Key - " + record.key());
                     log.info("Message routing to " + topicName[counter % 3]);
+                    log.info("Backup routing to " + topicName[(counter % 3) + 3]);
 
                     // Assuming the value is an image byte array (JPEG format)
                     byte[] imageData = record.value();
@@ -80,24 +112,44 @@ public class HeadNode {
                     // create a Producer Record
                     ProducerRecord<String, byte[]> producerRecord = new ProducerRecord<>(topicName[counter % 3], path, imageData);
 
-                    // send the record (asynchronous)
+                    // send the record (asynchronous) to storage
                     producer.send(producerRecord);
+
+                    // send the topic to the topic
+                    producerRecord = new ProducerRecord<>(topicName[(counter % 3) + 3], path, imageData);
+                    producer.send(producerRecord);
+
+
+                    // updating the hashmap with the storage node the message got assigned to
+                    // this is essentially the metadata
+                    locationMap.put(record.key(), counter % 3);
+                    ObjectMapper mapper = new ObjectMapper();
+                    try {
+                        ObjectWriter writer = mapper.writerWithDefaultPrettyPrinter();
+                        writer.writeValue(new File("/Users/ravisanker/Documents/Acads/Academics_4_1/DSTN/Project/meta/metadata.json"), locationMap);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                    counter++;
+
+                    if (counter % 10 == 1) {
+                        producerRecord = new ProducerRecord<>("meta", hashMapToByteArray(locationMap));
+                        log.info("Meta data successfully sent to topic meta");
+                        producer.send(producerRecord);
+                    }
 
                     // tell the producer to send all data and block until done (synchronous call)
                     producer.flush();
 
                     // close the producer
                     producer.close();
-
-                    location.put(record.key(), counter);
-                    counter++;
                 }
             }
         } catch (Exception e) {
-            log.error("Unexpected exception in the consumer", e);
+            log.error("Unexpected exception in the head node", e);
         } finally {
-            consumer.close(); // close the consumer
-            log.info("The consumer is now gracefully shut down");
+            consumer.close();
+            log.info("The head node is now gracefully shut down");
         }
 
     }
