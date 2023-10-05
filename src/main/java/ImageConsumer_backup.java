@@ -16,16 +16,16 @@ import java.util.Arrays;
 import java.util.Properties;
 import java.util.UUID;
 
-public class ImageConsumer {
+public class ImageConsumer_backup {
 
     private static final Logger log = LoggerFactory.getLogger(ImageConsumer.class.getSimpleName());
 
     public static void main(String[] args) {
-        log.info("I am a Kafka Consumer!");
+        log.info("I am a Kafka Consume backup!");
         UUID random = UUID.randomUUID();
 
         String groupId = random.toString();
-        String topic = "consumer0";
+        String topic = "storage1_backup";
 
         // create Consumer Properties
         Properties properties = new Properties();
@@ -62,15 +62,15 @@ public class ImageConsumer {
                         String path = record.key().substring(0, record.key().length() - 4);
                         String token[] = path.split("/");
 
-                        path = "/home/rahul/Documents/DSTN-main/DSTN-main/recv/";
+                        path = "/home/rahul/Documents/DSTN-main/DSTN-main/backup/";
                         String imagePath;
 //                      imagePath = path + "blr.jpg";
-                        imagePath = path + token[token.length - 1] + ".jpg";
+                        imagePath = path + token[token.length - 1] + "JPEG";
 
                         File outputFile = new File(imagePath);
                         outputFile.createNewFile();
 
-                        ImageIO.write(image, "jpg", outputFile);
+                        ImageIO.write(image, "JPEG", outputFile);
                         log.info("Saved image to: " + imagePath);
                     } catch (IOException e) {
                         log.error("Error while processing or saving the image", e);
