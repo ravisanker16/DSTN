@@ -65,11 +65,11 @@ public class ImageConsumer_backup {
                         path = "/home/rahul/Documents/DSTN-main/DSTN-main/backup/";
                         String imagePath;
 //                      imagePath = path + "blr.jpg";
-<<<<<<< HEAD
+
                         imagePath = path + token[token.length - 1] + "JPEG";
-=======
-                        imagePath = path + token[token.length-1] +"JPEG";
->>>>>>> 55ad5c50687bf7b68a4bb73d1d78be3476da5cbb
+
+                        imagePath = path + token[token.length - 1] + "JPEG";
+
 
                         File outputFile = new File(imagePath);
                         outputFile.createNewFile();
