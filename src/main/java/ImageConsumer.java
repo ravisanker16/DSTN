@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Properties;
+import java.util.UUID;
 
 public class ImageConsumer {
 
@@ -21,9 +22,10 @@ public class ImageConsumer {
 
     public static void main(String[] args) {
         log.info("I am a Kafka Consumer!");
+        UUID random = UUID.randomUUID();
 
-        String groupId = "my-java-application";
-        String topic = "consumer1";
+        String groupId = random.toString();
+        String topic = "consumer0";
 
         // create Consumer Properties
         Properties properties = new Properties();
@@ -35,7 +37,7 @@ public class ImageConsumer {
         properties.setProperty("key.deserializer", StringDeserializer.class.getName());
         properties.setProperty("value.deserializer", ByteArrayDeserializer.class.getName());
         properties.setProperty("group.id", groupId);
-        properties.setProperty("auto.offset.reset", "earliest");
+        properties.setProperty("auto.offset.reset", "latest");
 
         // create a consumer
         KafkaConsumer<String, byte[]> consumer = new KafkaConsumer<>(properties);
@@ -58,7 +60,12 @@ public class ImageConsumer {
                     try {
                         BufferedImage image = ImageIO.read(new ByteArrayInputStream(imageData));
                         String path = record.key().substring(0, record.key().length() - 4);
-                        String imagePath = path + "rcv" + ".jpg";
+                        String token[] = path.split("/");
+
+                        path = "/home/rahul/Documents/DSTN-main/DSTN-main/recv/";
+                        String imagePath;
+//                      imagePath = path + "blr.jpg";
+                        imagePath = path + token[token.length-1] +".jpg";
 
                         File outputFile = new File(imagePath);
                         outputFile.createNewFile();
