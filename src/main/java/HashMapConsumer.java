@@ -16,6 +16,8 @@ import java.util.UUID;
 
 
 public class HashMapConsumer {
+
+    //map
     private static final Logger log = LoggerFactory.getLogger(ImageConsumer.class.getSimpleName());
 
     public static <ObjectMapper> void main(String[] args) {
