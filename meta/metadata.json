@@ -1,5 +1,11 @@
 {
-  "/Users/ravisanker/Documents/Acads/Academics_4_1/DSTN/Project/img/maa.jpg" : 2,
-  "/Users/ravisanker/Documents/Acads/Academics_4_1/DSTN/Project/img/tvm.jpg" : 0,
-  "/Users/ravisanker/Documents/Acads/Academics_4_1/DSTN/Project/img/blr.jpg" : 1
+  "ILSVRC2012_val_00000025.JPEG" : 1,
+  "ILSVRC2012_val_00000027.JPEG" : 0,
+  "ILSVRC2012_val_00000028.JPEG" : 1,
+  "ILSVRC2012_val_00000024.JPEG" : 0,
+  "ILSVRC2012_val_00000026.JPEG" : 2,
+  "ILSVRC2012_val_00000029.JPEG" : 2,
+  "ILSVRC2012_val_00000021.JPEG" : 0,
+  "ILSVRC2012_val_00000023.JPEG" : 2,
+  "ILSVRC2012_val_00000022.JPEG" : 1
 }

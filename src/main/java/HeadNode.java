@@ -65,7 +65,7 @@ public class HeadNode {
 
         String groupId = "i-am-head-node";
         String topic = "initial";
-        String ipAddress = "10.50.1.3:9092";
+        String ipAddress = "10.70.14.129:9092";
 
         // create Consumer Properties
         Properties properties = new Properties();
@@ -77,7 +77,7 @@ public class HeadNode {
         properties.setProperty("key.deserializer", StringDeserializer.class.getName());
         properties.setProperty("value.deserializer", ByteArrayDeserializer.class.getName());
         properties.setProperty("group.id", groupId);
-        properties.setProperty("auto.offset.reset", "earliest");
+        properties.setProperty("auto.offset.reset", "latest");
 
         // create a consumer
         KafkaConsumer<String, byte[]> consumer = new KafkaConsumer<>(properties);
@@ -130,13 +130,14 @@ public class HeadNode {
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
-                    counter++;
 
-                    if (counter % 10 == 1) {
+                    if (counter >= 0) {
                         producerRecord = new ProducerRecord<>("meta", hashMapToByteArray(locationMap));
                         log.info("Meta data successfully sent to topic meta");
                         producer.send(producerRecord);
                     }
+
+                    counter++;
 
                     // tell the producer to send all data and block until done (synchronous call)
                     producer.flush();
@@ -144,6 +145,8 @@ public class HeadNode {
                     // close the producer
                     producer.close();
                 }
+
+
             }
         } catch (Exception e) {
             log.error("Unexpected exception in the head node", e);

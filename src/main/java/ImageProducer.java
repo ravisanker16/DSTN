@@ -20,7 +20,7 @@ public class ImageProducer {
         log.info("Image Produce");
         String imgName[] = new String[]{"blr.jpg", "maa.jpg", "tvm.jpg"};
         for (int i = 0; i < 3; i++) {
-            String path = "/Users/ravisanker/Documents/Acads/Academics_4_1/DSTN/Project/img/" + imgName[2];
+            String path = "/Users/ravisanker/Documents/Acads/Academics_4_1/DSTN/Project/img/" + imgName[i];
             File imageFile = new File(path);
             if (!imageFile.exists()) {
                 System.err.println("Image file does not exist at the specified path: " + path);

@@ -68,8 +68,6 @@ public class ImageConsumer_backup {
 
                         imagePath = path + token[token.length - 1] + "JPEG";
 
-                        imagePath = path + token[token.length - 1] + "JPEG";
-
 
                         File outputFile = new File(imagePath);
                         outputFile.createNewFile();
