@@ -6,35 +6,30 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
-import java.io.ObjectInputStream;
+import java.io.File;
+import java.io.IOException;
 import java.time.Duration;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Properties;
 import java.util.UUID;
 
-
-public class HashMapConsumer {
-
-    //map
+public class ImageConsumerBackup implements Runnable {
+    private String groupId;
     private static final Logger log = LoggerFactory.getLogger(ImageConsumer.class.getSimpleName());
+    private static final String ipAddress = "10.50.7.242:9092";
 
-    public static <ObjectMapper> void main(String[] args) {
-        log.info("I am a Kafka Hashmap consumer!");
+    public void run() {
+        log.info("I am a Kafka Consume backup!");
+
+        String topic = "storage1_backup";
         UUID random = UUID.randomUUID();
+        groupId = random.toString();
 
-        String groupId = random.toString();
-        groupId = "abc";
-        String topic = "meta";
-
-        // create Consumer Properties
         Properties properties = new Properties();
-
-        // connect to Kafka broker(s)
-        properties.setProperty("bootstrap.servers", "10.50.1.3:9092");
-
-        // create consumer configs
+        properties.setProperty("bootstrap.servers", ipAddress);
         properties.setProperty("key.deserializer", StringDeserializer.class.getName());
         properties.setProperty("value.deserializer", ByteArrayDeserializer.class.getName());
         properties.setProperty("group.id", groupId);
@@ -49,27 +44,35 @@ public class HashMapConsumer {
         try {
             // poll for data
             while (true) {
-                ConsumerRecords<String, byte[]> records = consumer.poll(Duration.ofMillis(10000));
-                log.info("outside for");
+                ConsumerRecords<String, byte[]> records = consumer.poll(Duration.ofMillis(1000));
+
                 for (ConsumerRecord<String, byte[]> record : records) {
                     log.info("Received message: Key - " + record.key());
 
                     // Assuming the value is an image byte array (JPEG format)
-                    byte[] value = record.value();
-                    log.info("before tryyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy");
-                    try (ByteArrayInputStream bis = new ByteArrayInputStream(value);
-                         ObjectInputStream ois = new ObjectInputStream(bis)) {
-                        log.info("insideeeeeeeeeeeeeeeeeeeeeee");
-
-                        HashMap<String, Integer> deserializedUser = (HashMap<String, Integer>) ois.readObject();
-
-
-                        System.out.println(deserializedUser);
-                        
-                    }
+                    byte[] imageData = record.value();
 
                     // Process and save the image to a file
+                    try {
+                        BufferedImage image = ImageIO.read(new ByteArrayInputStream(imageData));
+                        String path = record.key().substring(0, record.key().length() - 4);
+                        String token[] = path.split("/");
 
+                        path = "/home/rahul/Documents/DSTN-main/DSTN-main/backup/";
+                        String imagePath;
+//                      imagePath = path + "blr.jpg";
+
+                        imagePath = path + token[token.length - 1] + "JPEG";
+
+
+                        File outputFile = new File(imagePath);
+                        outputFile.createNewFile();
+
+                        ImageIO.write(image, "JPEG", outputFile);
+                        log.info("Saved image to: " + imagePath);
+                    } catch (IOException e) {
+                        log.error("Error while processing or saving the image", e);
+                    }
                 }
             }
         } catch (Exception e) {

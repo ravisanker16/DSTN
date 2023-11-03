@@ -1,2 +1,5 @@
 rootProject.name = 'Project'
+include 'head-node'
+include 'storage-node'
+include 'producer'
 

@@ -1,3 +1,7 @@
+/*
+ * produce 3 images to the 'initial' topic
+ */
+
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
@@ -25,9 +29,9 @@ public class ImageProducer {
             if (!imageFile.exists()) {
                 System.err.println("Image file does not exist at the specified path: " + path);
 
-                // Handle the error or exit gracefully
-            } else
+            } else {
                 System.out.println("File exits!");
+            }
             // read image
             try {
                 BufferedImage bImage = ImageIO.read(new File(path));
@@ -48,8 +52,8 @@ public class ImageProducer {
 
                 // create a Producer Record
                 String topic = "initial";
-                ProducerRecord<String, byte[]> producerRecord =
-                        new ProducerRecord<>(topic, path, data);
+                String key = imgName[i];
+                ProducerRecord<String, byte[]> producerRecord = new ProducerRecord<>(topic, key, data);
 
                 // send the record (asynchronous)
                 producer.send(producerRecord);

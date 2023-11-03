@@ -38,6 +38,9 @@ public class HeadNode {
 
     private static HashMap<String, Integer> locationMap = new HashMap<>();
 
+    private static String groupId = "i-am-head-node";
+    private static String ipAddress = "10.70.14.129:9092";
+
     public static byte[] hashMapToByteArray(HashMap<String, Integer> hashMap) {
         try {
             ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
@@ -63,9 +66,8 @@ public class HeadNode {
     public static void main(String[] args) {
         log.info("I am the Head Node!");
 
-        String groupId = "i-am-head-node";
+
         String topic = "initial";
-        String ipAddress = "10.70.14.129:9092";
 
         // create Consumer Properties
         Properties properties = new Properties();

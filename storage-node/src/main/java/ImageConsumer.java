@@ -18,22 +18,34 @@ import java.util.UUID;
 
 public class ImageConsumer {
 
+    private static String groupId;
     private static final Logger log = LoggerFactory.getLogger(ImageConsumer.class.getSimpleName());
+    private static final String ipAddress = "10.50.7.242:9092";
 
     public static void main(String[] args) {
         log.info("I am a Kafka Consumer!");
-        UUID random = UUID.randomUUID();
 
-        String groupId = random.toString();
-        String topic = "consumer0";
+        UUID random = UUID.randomUUID();
+        groupId = random.toString();
+
+
+        Thread threadPing = new Thread(new PingHeadNode());
+        threadPing.start();
+
+
+        /*
+         * Uncomment this only if this Storage Node is acting as the Backup Head Node
+        Thread threadMeta = new Thread(new HashMapConsumer());
+        threadMeta.start();
+        Thread threadBackup = new Thread(new ImageConsumerBackup());
+        threadBackup.start();
+        */
+
+        String topic = "storage0";
 
         // create Consumer Properties
         Properties properties = new Properties();
-
-        // connect to Kafka broker(s)
-        properties.setProperty("bootstrap.servers", "10.50.1.3:9092");
-
-        // create consumer configs
+        properties.setProperty("bootstrap.servers", ipAddress);
         properties.setProperty("key.deserializer", StringDeserializer.class.getName());
         properties.setProperty("value.deserializer", ByteArrayDeserializer.class.getName());
         properties.setProperty("group.id", groupId);
@@ -62,14 +74,10 @@ public class ImageConsumer {
                         String path = record.key().substring(0, record.key().length() - 4);
                         String token[] = path.split("/");
 
-                        path = "/home/rahul/Documents/DSTN-main/DSTN-main/recv/";
+                        path = "/Users/ravisanker/Documents/Acads/Academics_4_1/DSTN/Project/img_recv/";
                         String imagePath;
-//                      imagePath = path + "blr.jpg";
 
                         imagePath = path + token[token.length - 1] + ".jpg";
-
-                        imagePath = path + token[token.length - 1] + ".jpg";
-
 
                         File outputFile = new File(imagePath);
                         outputFile.createNewFile();
@@ -87,5 +95,7 @@ public class ImageConsumer {
             consumer.close(); // close the consumer
             log.info("The consumer is now gracefully shut down");
         }
+
+
     }
 }
