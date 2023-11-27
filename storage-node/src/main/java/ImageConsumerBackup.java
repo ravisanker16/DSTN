@@ -19,7 +19,7 @@ import java.util.UUID;
 public class ImageConsumerBackup implements Runnable {
     private String groupId;
     private static final Logger log = LoggerFactory.getLogger(ImageConsumer.class.getSimpleName());
-    private static final String ipAddress = "10.50.7.242:9092";
+    private static final String ipAddress = "10.70.33.130:9092";
 
     public void run() {
         log.info("I am a Kafka Consume backup!");

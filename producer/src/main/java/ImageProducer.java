@@ -41,7 +41,7 @@ public class ImageProducer {
 
                 // create producer properties
                 Properties properties = new Properties();
-                properties.setProperty("bootstrap.servers", "10.50.1.3:9092");
+                properties.setProperty("bootstrap.servers", "10.70.33.130:9092");
 
                 // set producer properties
                 properties.setProperty("key.serializer", StringSerializer.class.getName());

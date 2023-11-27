@@ -1,34 +1,46 @@
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.common.serialization.ByteArrayDeserializer;
-import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
-import java.io.File;
 import java.io.IOException;
-import java.time.Duration;
-import java.util.Arrays;
-import java.util.Properties;
-import java.util.UUID;
+import java.io.ObjectOutputStream;
+import java.net.Socket;
 
 public class ImageConsumer {
 
     private static String groupId;
     private static final Logger log = LoggerFactory.getLogger(ImageConsumer.class.getSimpleName());
-    private static final String ipAddress = "10.50.7.242:9092";
+    private static final String ipAddress = "10.70.33.130:9092";
 
     public static void main(String[] args) {
         log.info("I am a Kafka Consumer!");
 
-        UUID random = UUID.randomUUID();
-        groupId = random.toString();
+        double myFreeSpaceSSD = StorageCapacity.getFreeSpaceSSD();
+        double myFreeSpaceHDD = StorageCapacity.getFreeSpaceHDD();
+        String topicName = "storage_0";
+
+        final String SERVER_HOST = "localhost";
+        final int SERVER_PORT = 12345;
+
+        try (Socket socket = new Socket(SERVER_HOST, SERVER_PORT);
+             ObjectOutputStream objectOutputStream = new ObjectOutputStream(socket.getOutputStream())) {
+
+            // Create a Packet object to send
+            ProfilePacket packetToSend = new ProfilePacket(topicName, myFreeSpaceSSD, myFreeSpaceHDD);
+
+            // Send the Packet to the server
+            objectOutputStream.writeObject(packetToSend);
+
+            System.out.println("Packet sent to server.");
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
 
+//        UUID random = UUID.randomUUID();
+//        groupId = random.toString();
+
+        /*
         Thread threadPing = new Thread(new PingHeadNode());
         threadPing.start();
 
@@ -41,6 +53,7 @@ public class ImageConsumer {
         threadBackup.start();
         */
 
+        /*
         String topic = "storage0";
 
         // create Consumer Properties
@@ -74,10 +87,10 @@ public class ImageConsumer {
                         String path = record.key().substring(0, record.key().length() - 4);
                         String token[] = path.split("/");
 
-                        path = "/Users/ravisanker/Documents/Acads/Academics_4_1/DSTN/Project/img_recv/";
+                        path = "/Users/ravisanker/Documents/Acads/Academics_4_1/DSTN/Project/img/";
                         String imagePath;
 
-                        imagePath = path + token[token.length - 1] + ".jpg";
+                        imagePath = path + token[token.length - 1] + "_recv.jpg";
 
                         File outputFile = new File(imagePath);
                         outputFile.createNewFile();
@@ -95,6 +108,7 @@ public class ImageConsumer {
             consumer.close(); // close the consumer
             log.info("The consumer is now gracefully shut down");
         }
+        */
 
 
     }

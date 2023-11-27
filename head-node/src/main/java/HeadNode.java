@@ -1,25 +1,13 @@
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectWriter;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.clients.producer.KafkaProducer;
-import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.common.serialization.ByteArrayDeserializer;
-import org.apache.kafka.common.serialization.ByteArraySerializer;
-import org.apache.kafka.common.serialization.StringDeserializer;
-import org.apache.kafka.common.serialization.StringSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.time.Duration;
-import java.util.Arrays;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.util.HashMap;
-import java.util.Properties;
 
 public class HeadNode {
 
@@ -39,7 +27,7 @@ public class HeadNode {
     private static HashMap<String, Integer> locationMap = new HashMap<>();
 
     private static String groupId = "i-am-head-node";
-    private static String ipAddress = "10.70.14.129:9092";
+    private static String ipAddress = "10.70.33.130:9092";
 
     public static byte[] hashMapToByteArray(HashMap<String, Integer> hashMap) {
         try {
@@ -66,6 +54,27 @@ public class HeadNode {
     public static void main(String[] args) {
         log.info("I am the Head Node!");
 
+        final int PORT = 12345;
+
+        try (ServerSocket serverSocket = new ServerSocket(PORT)) {
+            System.out.println("Server is listening on port " + PORT);
+
+            while (true) {
+                Socket clientSocket = serverSocket.accept();
+                System.out.println("Client connected: " + clientSocket.getInetAddress());
+
+                // Handle client communication in a new thread
+                Thread clientHandler = new Thread(() -> handleClient(clientSocket));
+                clientHandler.start();
+            }
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        /*
+        Thread threadPingAck = new Thread(new PingAck());
+        threadPingAck.start();
 
         String topic = "initial";
 
@@ -156,6 +165,25 @@ public class HeadNode {
             consumer.close();
             log.info("The head node is now gracefully shut down");
         }
+        */
 
+
+    }
+
+    private static void handleClient(Socket clientSocket) {
+        try (ObjectInputStream objectInputStream = new ObjectInputStream(clientSocket.getInputStream())) {
+            // Read the Packet object from the client
+            ProfilePacket packet = (ProfilePacket) objectInputStream.readObject();
+
+            // Print the received values
+            System.out.println("Received topic name: " + packet.getTopicName());
+            System.out.println("Received free space in SSD: " + packet.getFreeSpaceSSD());
+            System.out.println("Received free space in HDD: " + packet.getFreeSpaceHDD());
+
+            System.out.println("Client disconnected: " + clientSocket.getInetAddress());
+
+        } catch (IOException | ClassNotFoundException e) {
+            e.printStackTrace();
+        }
     }
 }

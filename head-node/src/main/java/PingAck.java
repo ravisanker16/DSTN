@@ -16,7 +16,7 @@ import java.util.UUID;
 public class PingAck implements Runnable {
     private static String groupId;
     private static final Logger log = LoggerFactory.getLogger(PingAck.class.getSimpleName());
-    private static final String ipAddress = "10.4.1.16";
+    private static final String ipAddress = "10.70.33.130:9092";
 
     public void run() {
         String topicFrom = "ping";
