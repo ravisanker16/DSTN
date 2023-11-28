@@ -1,7 +1,9 @@
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
 
@@ -31,6 +33,10 @@ public class ImageConsumer {
             objectOutputStream.writeObject(packetToSend);
 
             System.out.println("Packet sent to server.");
+
+            BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            String message = reader.readLine();
+            System.out.println("Received message from head node: " + message);
 
         } catch (IOException e) {
             e.printStackTrace();
