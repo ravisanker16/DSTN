@@ -2,24 +2,24 @@ import java.io.Serializable;
 
 public class ProfilePacket implements Serializable {
     private String topicName;
-    private double freeSpaceSSD;
-    private double freeSpaceHDD;
+    private double freeSpace;
+    private boolean isSSD;
 
-    public ProfilePacket(String topicName, double freeSpaceSSD, double freeSpaceHDD) {
+    public ProfilePacket(String topicName, double freeSpace, boolean isSSD) {
         this.topicName = topicName;
-        this.freeSpaceSSD = freeSpaceSSD;
-        this.freeSpaceHDD = freeSpaceHDD;
+        this.freeSpace = freeSpace;
+        this.isSSD = isSSD;
     }
 
     public String getTopicName() {
         return topicName;
     }
 
-    public double getFreeSpaceSSD() {
-        return freeSpaceSSD;
+    public double getFreeSpace() {
+        return freeSpace;
     }
 
-    public double getFreeSpaceHDD() {
-        return freeSpaceHDD;
+    public boolean isSSD() {
+        return isSSD;
     }
 }

@@ -81,8 +81,8 @@ public class HeadNode {
 
                 // Print the received values
                 System.out.println("Received topic name: " + packet.getTopicName());
-                System.out.println("Received free space in SSD: " + packet.getFreeSpaceSSD());
-                System.out.println("Received free space in HDD: " + packet.getFreeSpaceHDD());
+                System.out.println("Received free space: " + packet.getFreeSpace());
+                System.out.println("Received isSSD: " + packet.isSSD());
 
                 if (topicNameToStorageNodeNumber.containsKey(packet.getTopicName())) {
                     try (PrintWriter writer = new PrintWriter(clientSocket.getOutputStream(), true)) {
@@ -105,20 +105,20 @@ public class HeadNode {
                     }
                 }
 
-                storageNodeNumberToTopicName.put(storageNodeCount, packet.getTopicName());
-                topicNameToStorageNodeNumber.put(packet.getTopicName(), storageNodeCount);
-                if (packet.getFreeSpaceSSD() != 0)
-                    maxHeapStorageSpace.add(new StorageNodeTuple(packet.getFreeSpaceSSD(), 1, storageNodeCount));
-                if (packet.getFreeSpaceHDD() != 0)
-                    maxHeapStorageSpace.add(new StorageNodeTuple(packet.getFreeSpaceHDD(), 0, storageNodeCount));
-                storageNodeNumberToTopicName.put(storageNodeCount, packet.getTopicName());
-
-                System.out.println("storage node number to topic name: " + storageNodeNumberToTopicName);
-                System.out.println("priority queue <space, number, isSSD>: " + maxHeapStorageSpace);
-
-                storageNodeCount++;
-
-                System.out.println("Client disconnected: " + clientSocket.getInetAddress());
+//                storageNodeNumberToTopicName.put(storageNodeCount, packet.getTopicName());
+//                topicNameToStorageNodeNumber.put(packet.getTopicName(), storageNodeCount);
+//                if (packet.getFreeSpaceSSD() != 0)
+//                    maxHeapStorageSpace.add(new StorageNodeTuple(packet.getFreeSpaceSSD(), 1, storageNodeCount));
+//                if (packet.getFreeSpaceHDD() != 0)
+//                    maxHeapStorageSpace.add(new StorageNodeTuple(packet.getFreeSpaceHDD(), 0, storageNodeCount));
+//                storageNodeNumberToTopicName.put(storageNodeCount, packet.getTopicName());
+//
+//                System.out.println("storage node number to topic name: " + storageNodeNumberToTopicName);
+//                System.out.println("priority queue <space, number, isSSD>: " + maxHeapStorageSpace);
+//
+//                storageNodeCount++;
+//
+//                System.out.println("Client disconnected: " + clientSocket.getInetAddress());
 
             } catch (IOException | ClassNotFoundException e) {
                 e.printStackTrace();

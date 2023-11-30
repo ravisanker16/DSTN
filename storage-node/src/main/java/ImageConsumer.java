@@ -18,6 +18,9 @@ public class ImageConsumer {
 
         double myFreeSpaceSSD = StorageCapacity.getFreeSpaceSSD();
         double myFreeSpaceHDD = StorageCapacity.getFreeSpaceHDD();
+        double myFreeSpace = myFreeSpaceSSD != 0 ? myFreeSpaceSSD : myFreeSpaceHDD;
+        boolean isSSD = myFreeSpaceSSD != 0 ? true : false;
+
         String topicName = "storage_0";
 
         final String SERVER_HOST = "localhost";
@@ -27,7 +30,7 @@ public class ImageConsumer {
              ObjectOutputStream objectOutputStream = new ObjectOutputStream(socket.getOutputStream())) {
 
             // Create a Packet object to send
-            ProfilePacket packetToSend = new ProfilePacket(topicName, myFreeSpaceSSD, myFreeSpaceHDD);
+            ProfilePacket packetToSend = new ProfilePacket(topicName, myFreeSpace, isSSD);
 
             // Send the Packet to the server
             objectOutputStream.writeObject(packetToSend);
