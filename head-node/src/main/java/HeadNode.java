@@ -48,8 +48,10 @@ public class HeadNode {
 
     private static PriorityQueue<StorageNodeTuple> maxHeapStorageSpace = new PriorityQueue<>();
 
+
     static class StorageNodeLookout extends Thread {
-        final int PORT = 12345;
+        final int PORT = 12344;
+
 
         public StorageNodeLookout() {
 
@@ -78,6 +80,8 @@ public class HeadNode {
             try (ObjectInputStream objectInputStream = new ObjectInputStream(clientSocket.getInputStream())) {
                 // Read the Packet object from the client
                 ProfilePacket packet = (ProfilePacket) objectInputStream.readObject();
+                int currentStorageNodeCount = storageNodeCount;
+                storageNodeCount++;
 
                 // Print the received values
                 System.out.println("Received topic name: " + packet.getTopicName());
@@ -85,44 +89,91 @@ public class HeadNode {
                 System.out.println("Received isSSD: " + packet.isSSD());
 
                 if (topicNameToStorageNodeNumber.containsKey(packet.getTopicName())) {
-                    try (PrintWriter writer = new PrintWriter(clientSocket.getOutputStream(), true)) {
+                    try {
+                        PrintWriter writer = new PrintWriter(clientSocket.getOutputStream(), true);
 
                         writer.println("Topic already exists! Choose another topic name.");
-                        clientSocket.close();
+
                         System.out.println("Connection closed.");
+
+                        // Don't close the writer here if you want to keep the socket open.
 
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
                     return;
                 } else {
-                    try (PrintWriter writer = new PrintWriter(clientSocket.getOutputStream(), true)) {
+                    try {
+                        PrintWriter writer = new PrintWriter(clientSocket.getOutputStream(), true);
 
                         writer.println("Topic does not exist! It will be created.");
+                        // createKafkaTopic(ipAddress + ":9092", packet.getTopicName());
+
+                        // Don't close the writer here if you want to keep the socket open.
 
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
                 }
 
-//                storageNodeNumberToTopicName.put(storageNodeCount, packet.getTopicName());
-//                topicNameToStorageNodeNumber.put(packet.getTopicName(), storageNodeCount);
-//                if (packet.getFreeSpaceSSD() != 0)
-//                    maxHeapStorageSpace.add(new StorageNodeTuple(packet.getFreeSpaceSSD(), 1, storageNodeCount));
-//                if (packet.getFreeSpaceHDD() != 0)
-//                    maxHeapStorageSpace.add(new StorageNodeTuple(packet.getFreeSpaceHDD(), 0, storageNodeCount));
-//                storageNodeNumberToTopicName.put(storageNodeCount, packet.getTopicName());
-//
-//                System.out.println("storage node number to topic name: " + storageNodeNumberToTopicName);
-//                System.out.println("priority queue <space, number, isSSD>: " + maxHeapStorageSpace);
-//
-//                storageNodeCount++;
-//
-//                System.out.println("Client disconnected: " + clientSocket.getInetAddress());
+
+                storageNodeNumberToTopicName.put(currentStorageNodeCount, packet.getTopicName());
+                topicNameToStorageNodeNumber.put(packet.getTopicName(), currentStorageNodeCount);
+
+                maxHeapStorageSpace.add(new StorageNodeTuple(packet.getFreeSpace(), packet.isSSD(), currentStorageNodeCount));
+
+
+                System.out.println("storage node number to topic name: " + storageNodeNumberToTopicName);
+                System.out.println("priority queue <space, number, isSSD>: " + maxHeapStorageSpace);
+
+
+                while (true) {
+                    System.out.println("Waiting for Hearbeat signal from storage node " + currentStorageNodeCount);
+                    //System.out.println("object input stream " + objectInputStream.);
+                    // Receive the periodic Packet from the server
+                    System.out.println("Socket is connected?: " + clientSocket.isConnected());
+                    //PeriodicHeartBeatPacket receivedPacket = (PeriodicHeartBeatPacket) objectInputStream.readObject();
+                    PeriodicHeartBeatPacket recvpacket = (PeriodicHeartBeatPacket) objectInputStream.readObject();
+
+                    // Handle the received periodic Packet
+                    System.out.println("Received periodic heartbeat message from storage node " + currentStorageNodeCount + ": " + recvpacket.getMessage());
+                }
 
             } catch (IOException | ClassNotFoundException e) {
                 e.printStackTrace();
             }
+        }
+
+        public static void createKafkaTopic(String bootstrapServers, String topic) {
+            System.out.println("Trying to create kafka topic");
+            try {
+                ProcessBuilder processBuilder = new ProcessBuilder(
+                        "kafka-topics",
+                        "--bootstrap-server", bootstrapServers,
+                        "--topic", topic,
+                        "--create"
+                );
+
+                // Redirect error stream to output stream
+                processBuilder.redirectErrorStream(true);
+
+                // Start the process
+                Process process = processBuilder.start();
+
+                // Wait for the process to finish
+                int exitCode = process.waitFor();
+
+                // Check the exit code
+                if (exitCode == 0) {
+                    System.out.println("Kafka topic created successfully.");
+                } else {
+                    System.err.println("Error creating Kafka topic. Exit code: " + exitCode);
+                }
+            } catch (IOException | InterruptedException e) {
+                System.out.println("ulsfjlksjfklshjf");
+                e.printStackTrace();
+            }
+            System.out.println("kfhjdskjhfs");
         }
 
     }
@@ -196,14 +247,28 @@ public class HeadNode {
                     // send the record (asynchronous) to storage
                     producer.send(producerRecord);
 
+                    // send the backup
+                    StorageNodeTuple topTupleForBackup = maxHeapStorageSpace.poll();
+                    String topicToSendBackupTo = storageNodeNumberToTopicName.get(topTupleForBackup.getStorageNodeNumber());
+                    producerRecord = new ProducerRecord<>(topicToSendBackupTo, path, imageData);
+                    producer.send(producerRecord);
 
                     // update the priority queue
+                    double updatedSpace = topTuple.getStorageSpace() - getSpaceInGB(imageData);
+                    StorageNodeTuple updatedTuple = new StorageNodeTuple(topTuple.getStorageSpace(), topTuple.isSSD(), topTuple.getStorageNodeNumber());
+                    maxHeapStorageSpace.add(updatedTuple);
 
-                    // send the backup
+                    updatedSpace = topTupleForBackup.getStorageSpace() - getSpaceInGB(imageData);
+                    updatedTuple = new StorageNodeTuple(topTupleForBackup.getStorageSpace(), topTupleForBackup.isSSD(), topTupleForBackup.getStorageNodeNumber());
+                    maxHeapStorageSpace.add(updatedTuple);
+
 
                     // updating the hashmap with the storage node the message got assigned to
                     // this is essentially the metadata
                     locationMap.put(record.key(), topTuple.getStorageNodeNumber());
+                    locationMap.put("backup_" + record.key(), topTupleForBackup.getStorageNodeNumber());
+
+                    // writing the meta data to a file
                     ObjectMapper mapper = new ObjectMapper();
                     try {
                         ObjectWriter writer = mapper.writerWithDefaultPrettyPrinter();
@@ -260,5 +325,10 @@ public class HeadNode {
         }
 
         return null; // Return null if there was an error
+    }
+
+    private static double getSpaceInGB(byte[] imageData) {
+        double sz = imageData.length;
+        return sz / (1024.0 * 1024 * 1024);
     }
 }

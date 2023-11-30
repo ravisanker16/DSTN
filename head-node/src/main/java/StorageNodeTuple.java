@@ -1,35 +1,39 @@
 class StorageNodeTuple implements Comparable<StorageNodeTuple> {
+    /*
+        w1 * x1 + w2 * x2
+        w1 = wtSpace
+        x1 = storage space
+        w2 = weight of bytes sent
+        x2 = number of bytes actually sent
+     */
+
+
+    private double wtSpace; // function of isSSD
+    private double wtBytesSent;
+
     private double storageSpace;
-    private int isSSD;
+    private double bytesSent;
+    private boolean isSSD;
     private int storageNodeNumber;
+
+    private double totWeightNode;
 
     private final int ratio = 2;
 
-    public StorageNodeTuple(double storageSpace, int isSSD, int storageNodeNumber) {
+    public StorageNodeTuple(double storageSpace, boolean isSSD, int storageNodeNumber) {
         this.storageSpace = storageSpace;
         this.isSSD = isSSD;
         this.storageNodeNumber = storageNodeNumber;
+        this.bytesSent = 0;
+        this.wtSpace = isSSD ? 0.5 : 0.3;
+        this.wtBytesSent = -2 * (1 / (1024 * 1024 * 1024));
+        setTotalWeight();
     }
 
     // Implement compareTo method for Comparable interface
     @Override
     public int compareTo(StorageNodeTuple other) {
-        if (other.storageNodeNumber == storageNodeNumber) {
-            if (isSSD == 1)
-                return -1;
-            return 1;
-        }
-
-        double node1Value = storageSpace;
-        double node2Value = other.storageSpace;
-
-        if (isSSD == 1)
-            node1Value *= ratio;
-
-        if (other.isSSD == 1)
-            node2Value *= ratio;
-
-        return Double.compare(node1Value, node2Value); // Reverse order for max heap
+        return Double.compare(totWeightNode, other.totWeightNode); // Reverse order for max heap
     }
 
     // Add getters if needed
@@ -42,9 +46,25 @@ class StorageNodeTuple implements Comparable<StorageNodeTuple> {
     public int getStorageNodeNumber() {
         return storageNodeNumber;
     }
-    
+
+    public boolean isSSD() {
+        return isSSD;
+    }
+
+    public void setStorageSpace(double storageSpace) {
+        this.storageSpace = storageSpace;
+    }
+
+    public void setBytesSent(double bytesSent) {
+        this.bytesSent = bytesSent;
+    }
+
+    public void setTotalWeight() {
+        this.totWeightNode = wtSpace * storageSpace + wtBytesSent * bytesSent;
+    }
+
 
     public String toString() {
-        return "(" + storageSpace + ", " + storageNodeNumber + ", " + isSSD + ")";
+        return "(wt=" + totWeightNode + ", node=" + storageNodeNumber + ",freeSpace=" + storageSpace + ")";
     }
 }

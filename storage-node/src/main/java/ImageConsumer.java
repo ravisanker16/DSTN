@@ -1,17 +1,63 @@
+//import com.fasterxml.jackson.databind.deser.std.StringDeserializer;
+
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.serialization.ByteArrayDeserializer;
+import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.ObjectOutputStream;
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.*;
 import java.net.Socket;
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.Properties;
+import java.util.Timer;
+import java.util.TimerTask;
 
 public class ImageConsumer {
 
-    private static String groupId;
+    private static final String groupId = "saketmac";
     private static final Logger log = LoggerFactory.getLogger(ImageConsumer.class.getSimpleName());
-    private static final String ipAddress = "10.70.33.130:9092";
+    private static final String ipAddress = "10.70.47.171:9092";
+    private static final long ONE_MINUTE = 60 * 1000;
+
+    private static class PeriodicHeartBeatSender extends Thread {
+        private final Socket socket;
+        private final ObjectOutputStream objectOutputStream;
+
+        public PeriodicHeartBeatSender(Socket socket, ObjectOutputStream objectOutputStream) {
+            this.socket = socket;
+            this.objectOutputStream = objectOutputStream;
+        }
+
+        @Override
+        public void run() {
+
+            Timer timer = new Timer(true);
+
+            // Schedule a task to run every 1 minute
+            timer.scheduleAtFixedRate(new TimerTask() {
+                @Override
+                public void run() {
+                    try {
+                        // Create a new Packet object for periodic sending
+                        PeriodicHeartBeatPacket periodicPacket = new PeriodicHeartBeatPacket("alive");
+
+                        // Send the periodic Packet to the server
+                        objectOutputStream.writeObject(periodicPacket);
+
+                        System.out.println("Periodic packet sent to server.");
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }, 0, ONE_MINUTE);
+        }
+    }
 
     public static void main(String[] args) {
         log.info("I am a Kafka Consumer!");
@@ -21,13 +67,20 @@ public class ImageConsumer {
         double myFreeSpace = myFreeSpaceSSD != 0 ? myFreeSpaceSSD : myFreeSpaceHDD;
         boolean isSSD = myFreeSpaceSSD != 0 ? true : false;
 
-        String topicName = "storage_0";
+        String topicName = "storagenode_1";
 
-        final String SERVER_HOST = "localhost";
-        final int SERVER_PORT = 12345;
+        final String SERVER_HOST = "10.70.47.171";
+        final int SERVER_PORT = 12344;
 
-        try (Socket socket = new Socket(SERVER_HOST, SERVER_PORT);
-             ObjectOutputStream objectOutputStream = new ObjectOutputStream(socket.getOutputStream())) {
+        Socket socket = null;
+        ObjectOutputStream objectOutputStream = null;
+
+        try {
+            // Create a Socket outside the try-with-resources block
+            socket = new Socket(SERVER_HOST, SERVER_PORT);
+
+            // Create an ObjectOutputStream outside the try-with-resources block
+            objectOutputStream = new ObjectOutputStream(socket.getOutputStream());
 
             // Create a Packet object to send
             ProfilePacket packetToSend = new ProfilePacket(topicName, myFreeSpace, isSSD);
@@ -41,13 +94,19 @@ public class ImageConsumer {
             String message = reader.readLine();
             System.out.println("Received message from head node: " + message);
 
+            // Start a new thread for periodic message sending
+            new PeriodicHeartBeatSender(socket, objectOutputStream).start();
+
+            System.out.println("Periodic Heard Beat Sender thread started");
+
         } catch (IOException e) {
             e.printStackTrace();
+        } finally {
+            // Close resources when they are no longer needed
+
         }
 
 
-//        UUID random = UUID.randomUUID();
-//        groupId = random.toString();
 
         /*
         Thread threadPing = new Thread(new PingHeadNode());
@@ -62,8 +121,6 @@ public class ImageConsumer {
         threadBackup.start();
         */
 
-        /*
-        String topic = "storage0";
 
         // create Consumer Properties
         Properties properties = new Properties();
@@ -77,7 +134,7 @@ public class ImageConsumer {
         KafkaConsumer<String, byte[]> consumer = new KafkaConsumer<>(properties);
 
         // subscribe to the topic
-        consumer.subscribe(Arrays.asList(topic));
+        consumer.subscribe(Arrays.asList(topicName));
 
         try {
             // poll for data
@@ -96,7 +153,7 @@ public class ImageConsumer {
                         String path = record.key().substring(0, record.key().length() - 4);
                         String token[] = path.split("/");
 
-                        path = "/Users/ravisanker/Documents/Acads/Academics_4_1/DSTN/Project/img/";
+                        path = "/Users/saket/Desktop/BITS_4-1/DSTN/Project/Codes/DSTN/rcv/";
                         String imagePath;
 
                         imagePath = path + token[token.length - 1] + "_recv.jpg";
@@ -117,7 +174,6 @@ public class ImageConsumer {
             consumer.close(); // close the consumer
             log.info("The consumer is now gracefully shut down");
         }
-        */
 
 
     }

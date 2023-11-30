@@ -1,5 +1,8 @@
 {
-  "blr.jpg" : 0,
+  "blr.jpg" : 1,
+  "backup_maa.jpg" : 0,
   "maa.jpg" : 1,
-  "tvm.jpg" : 2
+  "tvm.jpg" : 1,
+  "backup_blr.jpg" : 0,
+  "backup_tvm.jpg" : 0
 }
