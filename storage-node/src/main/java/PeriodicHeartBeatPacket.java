@@ -1,4 +1,4 @@
-import java.io.Serializable;
+import java.io.*;
 
 public class PeriodicHeartBeatPacket implements Serializable {
     private String message;
