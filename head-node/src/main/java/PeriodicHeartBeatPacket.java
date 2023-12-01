@@ -1,16 +1,33 @@
 import java.io.*;
+import java.util.List;
 
 public class PeriodicHeartBeatPacket implements Serializable {
     private String message;
     private double memFreePerc;
+    private List<String> latestImagesReceieved;
+    
 
-
-    public PeriodicHeartBeatPacket(String message) {
+    public PeriodicHeartBeatPacket(String message, List<String> latestImagesReceieved) {
         this.message = message;
+        this.memFreePerc = 0;
+        this.latestImagesReceieved = latestImagesReceieved;
+
     }
 
     public String getMessage() {
         return message;
+    }
+
+    public List<String> getLatestImagesList() {
+        return latestImagesReceieved;
+    }
+
+    public void setLatestImages(List<String> stringList) {
+        this.latestImagesReceieved = stringList;
+    }
+
+    public void addString(String newString) {
+        this.latestImagesReceieved.add(newString);
     }
 
     public void addProfile() {
@@ -46,7 +63,6 @@ public class PeriodicHeartBeatPacket implements Serializable {
                 reader.close();
             } else {
                 // if command failed, set memory as not available
-                memFreePerc = 0.0;
                 System.out.println("Command execution failed with exit code: " + exitCode);
             }
 

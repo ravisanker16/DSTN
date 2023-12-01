@@ -41,6 +41,7 @@ public class HeadNode {
     private static int storageNodeCount = 0;
 
     private static PriorityQueue<StorageNodeTuple> maxHeapStorageSpace = new PriorityQueue<>();
+    private static HashMap<Integer, Boolean> validityStorageNode = new HashMap<>();
 
     /*
      * This is for the head node looking out for more storage nodes to join
@@ -77,7 +78,6 @@ public class HeadNode {
                 // Read the Packet object from the client
                 ProfilePacket packet = (ProfilePacket) objectInputStream.readObject();
                 int currentStorageNodeCount = storageNodeCount;
-                storageNodeCount++;
 
                 // Print the received values
                 System.out.println("Received topic name: " + packet.getTopicName());
@@ -99,7 +99,8 @@ public class HeadNode {
 
                         writer.println("Topic does not exist! It will be created.");
                         createKafkaTopic(ipAddress + ":9092", packet.getTopicName());
-
+                        validityStorageNode.put(currentStorageNodeCount, true);
+                        storageNodeCount++;
 
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -121,9 +122,28 @@ public class HeadNode {
                     System.out.println("Waiting for Hearbeat signal from storage node " + currentStorageNodeCount);
                     PeriodicHeartBeatPacket recvpacket = (PeriodicHeartBeatPacket) objectInputStream.readObject();
                     System.out.println("Received periodic heartbeat message from storage node " + currentStorageNodeCount + ": " + recvpacket.getMessage());
+
+                    for (String imgName : recvpacket.getLatestImagesList()) {
+                        updateMetaData(imgName, currentStorageNodeCount);
+                    }
                 }
 
             } catch (IOException | ClassNotFoundException e) {
+                e.printStackTrace();
+            }
+        }
+
+        public static void updateMetaData(String imgName, int storageNodeNumber) {
+            // updating the hashmap with the storage node the message got assigned to
+            // this is essentially the metadata
+            locationMap.put(imgName, storageNodeNumber);
+
+            // writing the meta data to a file
+            ObjectMapper mapper = new ObjectMapper();
+            try {
+                ObjectWriter writer = mapper.writerWithDefaultPrettyPrinter();
+                writer.writeValue(new File("/Users/ravisanker/Documents/Acads/Academics_4_1/DSTN/Project/meta/metadata.json"), locationMap);
+            } catch (IOException e) {
                 e.printStackTrace();
             }
         }
@@ -427,7 +447,7 @@ public class HeadNode {
 
                     StorageNodeTuple topTupleForBackup = maxHeapStorageSpace.poll();
                     String topicToSendBackupTo = storageNodeNumberToTopicName.get(topTupleForBackup.getStorageNodeNumber());
-                    producerRecord = new ProducerRecord<>(topicToSendBackupTo, path, imageData);
+                    producerRecord = new ProducerRecord<>(topicToSendBackupTo, "backup_" + path, imageData);
                     System.out.println("Sending backup image " + path + " to topic " + topicToSendBackupTo);
                     producer.send(producerRecord);
 
@@ -440,20 +460,6 @@ public class HeadNode {
                     updatedTuple = new StorageNodeTuple(topTupleForBackup.getStorageSpace(), topTupleForBackup.isSSD(), topTupleForBackup.getStorageNodeNumber());
                     maxHeapStorageSpace.add(updatedTuple);
 
-
-                    // updating the hashmap with the storage node the message got assigned to
-                    // this is essentially the metadata
-                    locationMap.put(record.key(), topTuple.getStorageNodeNumber());
-                    locationMap.put("backup_" + record.key(), topTupleForBackup.getStorageNodeNumber());
-
-                    // writing the meta data to a file
-                    ObjectMapper mapper = new ObjectMapper();
-                    try {
-                        ObjectWriter writer = mapper.writerWithDefaultPrettyPrinter();
-                        writer.writeValue(new File("/Users/ravisanker/Documents/Acads/Academics_4_1/DSTN/Project/meta/metadata.json"), locationMap);
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
 
                     if (counter >= 0) {
                         String topicToSendMetaDataTo = "meta";

@@ -30,6 +30,7 @@ public class ImageConsumer {
     private static final long ONE_MINUTE = 60 * 1000;
     private static String topicName = "storagenode_1";
     private static String topicToConsumeRequests = "img-req-for-storage-node";
+    private static List<String> latestImagesReceived = new ArrayList<String>();
 
     /*
      * This is for sending periodic heart beats
@@ -57,9 +58,10 @@ public class ImageConsumer {
                 public void run() {
                     try {
                         // Create a new Packet object for periodic sending
-                        PeriodicHeartBeatPacket periodicPacket = new PeriodicHeartBeatPacket("alive");
+                        PeriodicHeartBeatPacket periodicPacket = new PeriodicHeartBeatPacket("alive", latestImagesReceived);
                         periodicPacket.addProfile();
                         objectOutputStream.writeObject(periodicPacket);
+                        latestImagesReceived.clear();
                         System.out.println("Periodic packet sent to server.");
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -223,9 +225,10 @@ public class ImageConsumer {
                     // Process and save the image to a file
                     try {
                         String imagePath = "/Users/saket/Desktop/BITS_4-1/DSTN/Project/Codes/DSTN/rcv/" + record.key();
-
                         FileUtils.writeByteArrayToFile(new File(imagePath), imageData);
                         log.info("Saved image to: " + imagePath);
+                        latestImagesReceived.add(record.key());
+
                     } catch (IOException e) {
                         log.error("Error while processing or saving the image", e);
                     }
