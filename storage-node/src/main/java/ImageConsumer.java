@@ -29,7 +29,7 @@ public class ImageConsumer {
     private static final Logger log = LoggerFactory.getLogger(ImageConsumer.class.getSimpleName());
     private static final long ONE_MINUTE = 60 * 1000;
     private static String topicName = "storagenode_1";
-    private static String topicToConsumeRequests = "img-req-from-storage-node";
+    private static String topicToConsumeRequests = "img-req-for-storage-node";
 
     /*
      * This is for sending periodic heart beats

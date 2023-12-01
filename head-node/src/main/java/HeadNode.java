@@ -19,10 +19,7 @@ import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.Duration;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.PriorityQueue;
-import java.util.Properties;
+import java.util.*;
 
 public class HeadNode {
 
@@ -31,11 +28,13 @@ public class HeadNode {
 
     private static final Logger log = LoggerFactory.getLogger(HeadNode.class.getSimpleName());
 
-    private static HashMap<String, Integer> locationMap = new HashMap<>();
 
-    private static String groupId = "i-am-head-node";
+    private static final UUID randomID = UUID.randomUUID();
+    private static final String groupId = randomID.toString();
     private static String ipAddress = ConfigFileUpdater.getIpAddress() + ":9092";
 
+    // this is for the meta data, maps image name to storage Node number
+    private static HashMap<String, Integer> locationMap = new HashMap<>();
 
     private static HashMap<Integer, String> storageNodeNumberToTopicName = new HashMap<>();
     private static HashMap<String, Integer> topicNameToStorageNodeNumber = new HashMap<>();
@@ -43,10 +42,12 @@ public class HeadNode {
 
     private static PriorityQueue<StorageNodeTuple> maxHeapStorageSpace = new PriorityQueue<>();
 
-
+    /*
+     * This is for the head node looking out for more storage nodes to join
+     * SCALABILITY!!!
+     **/
     static class StorageNodeLookout extends Thread {
         final int PORT = 12344;
-
 
         public StorageNodeLookout() {
 
@@ -86,12 +87,7 @@ public class HeadNode {
                 if (topicNameToStorageNodeNumber.containsKey(packet.getTopicName())) {
                     try {
                         PrintWriter writer = new PrintWriter(clientSocket.getOutputStream(), true);
-
                         writer.println("Topic already exists! Choose another topic name.");
-
-                        System.out.println("Connection closed.");
-
-                        // Don't close the writer here if you want to keep the socket open.
 
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -102,9 +98,8 @@ public class HeadNode {
                         PrintWriter writer = new PrintWriter(clientSocket.getOutputStream(), true);
 
                         writer.println("Topic does not exist! It will be created.");
-                        // createKafkaTopic(ipAddress + ":9092", packet.getTopicName());
+                        createKafkaTopic(ipAddress + ":9092", packet.getTopicName());
 
-                        // Don't close the writer here if you want to keep the socket open.
 
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -124,13 +119,7 @@ public class HeadNode {
 
                 while (true) {
                     System.out.println("Waiting for Hearbeat signal from storage node " + currentStorageNodeCount);
-                    //System.out.println("object input stream " + objectInputStream.);
-                    // Receive the periodic Packet from the server
-
-                    //PeriodicHeartBeatPacket receivedPacket = (PeriodicHeartBeatPacket) objectInputStream.readObject();
                     PeriodicHeartBeatPacket recvpacket = (PeriodicHeartBeatPacket) objectInputStream.readObject();
-
-                    // Handle the received periodic Packet
                     System.out.println("Received periodic heartbeat message from storage node " + currentStorageNodeCount + ": " + recvpacket.getMessage());
                 }
 
@@ -165,13 +154,17 @@ public class HeadNode {
                     System.err.println("Error creating Kafka topic. Exit code: " + exitCode);
                 }
             } catch (IOException | InterruptedException e) {
+                System.out.println("Error in creating Kafka topic");
                 e.printStackTrace();
             }
         }
 
     }
 
-
+    /*
+     * This is for the head node in constant lookout
+     * for requests from Group-1
+     * */
     static class ImageRequestLookout extends Thread {
 
 
@@ -182,6 +175,11 @@ public class HeadNode {
         @Override
         public void run() {
 
+            /*
+             * Images produced by the storage node
+             * is being consumed and produced to
+             * a topic consumed by Group-1
+             * */
             Thread fetchImage = new Thread(() -> fetchImageHandler());
             fetchImage.start();
 
@@ -222,6 +220,7 @@ public class HeadNode {
                                 System.out.println("Value for key '" + keyToFind + "': " + value);
                             } else {
                                 System.out.println("Error: Key '" + keyToFind + "' not found in the JSON file or not an integer.");
+                                continue;
                             }
 
                             // send the request to the common topic "img-req-from-storage-node"
@@ -318,7 +317,7 @@ public class HeadNode {
         }
 
         private static void sendImageRequestToCommonTopic(String imgName, int storageNode) {
-            String topic = "img-req-from-storage-node";
+            String topic = "img-req-for-storage-node";
 
             // create Consumer Properties
             Properties properties = new Properties();
@@ -328,7 +327,7 @@ public class HeadNode {
             properties.setProperty("group.id", groupId);
             properties.setProperty("auto.offset.reset", "latest");
             properties.setProperty("key.serializer", StringSerializer.class.getName());
-            properties.setProperty("value.serializer", ByteArraySerializer.class.getName());
+            properties.setProperty("value.serializer", StringSerializer.class.getName());
 
             // create the producer
             KafkaProducer<String, String> producer = new KafkaProducer<>(properties);
@@ -342,30 +341,7 @@ public class HeadNode {
             producer.close();
         }
 
-        private static void readRequestedImageFromCommonTopic(String imgName, String storageNode) {
-            String topic = "img-req-from-storage-node";
 
-            // create Consumer Properties
-            Properties properties = new Properties();
-
-            // connect to Kafka broker(s)
-            properties.setProperty("bootstrap.servers", ipAddress);
-            properties.setProperty("group.id", groupId);
-            properties.setProperty("auto.offset.reset", "latest");
-            properties.setProperty("key.serializer", StringSerializer.class.getName());
-            properties.setProperty("value.serializer", ByteArraySerializer.class.getName());
-
-            // create the producer
-            KafkaProducer<String, String> producer = new KafkaProducer<>(properties);
-
-            // create a Producer Record
-            ProducerRecord<String, String> producerRecord = new ProducerRecord<>(topic, imgName, storageNodeNumberToTopicName.get(storageNode));
-
-            System.out.println("Sending request for image " + imgName + " to topic " + topic);
-            producer.send(producerRecord);
-            producer.flush();
-            producer.close();
-        }
     }
 
 
@@ -480,8 +456,9 @@ public class HeadNode {
                     }
 
                     if (counter >= 0) {
-                        producerRecord = new ProducerRecord<>("meta", hashMapToByteArray(locationMap));
-                        log.info("Meta data successfully sent to topic meta");
+                        String topicToSendMetaDataTo = "meta";
+                        producerRecord = new ProducerRecord<>(topicToSendMetaDataTo, hashMapToByteArray(locationMap));
+                        log.info("Metadata successfully sent to topic meta");
                         producer.send(producerRecord);
                     }
 
