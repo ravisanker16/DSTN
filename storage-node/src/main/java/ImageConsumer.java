@@ -1,30 +1,42 @@
 //import com.fasterxml.jackson.databind.deser.std.StringDeserializer;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
+import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
 import java.io.*;
 import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
-import java.util.Arrays;
-import java.util.Properties;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.*;
 
 public class ImageConsumer {
-
-    private static final String groupId = "saketmac";
-    private static final Logger log = LoggerFactory.getLogger(ImageConsumer.class.getSimpleName());
     private static final String ipAddress = "10.70.47.171:9092";
-    private static final long ONE_MINUTE = 60 * 1000;
 
+    private static final UUID randomID = UUID.randomUUID();
+    private static final String groupId = randomID.toString();
+    private static final Logger log = LoggerFactory.getLogger(ImageConsumer.class.getSimpleName());
+    private static final long ONE_MINUTE = 60 * 1000;
+    private static String topicName = "storagenode_1";
+    private static String topicToConsumeRequests = "img-req-from-storage-node";
+
+    /*
+     * This is for sending periodic heart beats
+     * to the head node
+     * telling it you're alive
+     *
+     * */
     private static class PeriodicHeartBeatSender extends Thread {
         private final Socket socket;
         private final ObjectOutputStream objectOutputStream;
@@ -46,11 +58,8 @@ public class ImageConsumer {
                     try {
                         // Create a new Packet object for periodic sending
                         PeriodicHeartBeatPacket periodicPacket = new PeriodicHeartBeatPacket("alive");
-                        // get current profile
                         periodicPacket.addProfile();
-                        // Send the periodic Packet to the server
                         objectOutputStream.writeObject(periodicPacket);
-
                         System.out.println("Periodic packet sent to server.");
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -60,15 +69,99 @@ public class ImageConsumer {
         }
     }
 
+    /*
+     * This is for handling image requests
+     * sent by head node
+     * and sending the image if it has
+     * to the common topic for head node to read
+     *
+     **/
+    private static void imageRequestHandler() {
+        // key->image name, value->topic name
+        Properties properties = new Properties();
+        properties.setProperty("bootstrap.servers", ipAddress);
+        properties.setProperty("key.deserializer", StringDeserializer.class.getName());
+        properties.setProperty("value.deserializer", StringDeserializer.class.getName());
+        properties.setProperty("group.id", groupId);
+        properties.setProperty("auto.offset.reset", "latest");
+
+        // create a consumer
+        KafkaConsumer<String, String> consumer = new KafkaConsumer<>(properties);
+        consumer.subscribe(Arrays.asList(topicToConsumeRequests));
+
+        try {
+
+            while (true) {
+                ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(1000));
+                for (ConsumerRecord<String, String> record : records) {
+                    log.info("Received image request for: " + record.key());
+
+                    // Assuming the value ia the topic name to which this storage node is subscribed to.
+                    String rcvTopicName = record.value();
+                    if (!rcvTopicName.equals(topicName))
+                        continue;
+
+                    // Process and save the image to a file
+                    try {
+                        String imgName = record.key();
+                        String imgPath = "/Users/saket/Desktop/BITS_4-1/DSTN/Project/Codes/DSTN/rcv/" + imgName;
+                        byte[] fileBytes = readBytesFromFile(imgPath);
+                        sendImageToCommonTopic(imgName, fileBytes);
+                    } catch (IOException e) {
+                        System.out.println("Error while processing or saving the image");
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("Unexpected exception in the consumer");
+        } finally {
+            consumer.close(); // close the consumer
+            System.out.println("The consumer is now gracefully shut down");
+        }
+    }
+
+    private static void sendImageToCommonTopic(String imgName, byte[] fileBytes) {
+        String topic = "img-from-storage-node";
+
+        // create Consumer Properties
+        Properties properties = new Properties();
+
+        // connect to Kafka broker(s)
+        properties.setProperty("bootstrap.servers", ipAddress);
+        properties.setProperty("group.id", groupId);
+        properties.setProperty("auto.offset.reset", "latest");
+        properties.setProperty("key.serializer", StringSerializer.class.getName());
+        properties.setProperty("value.serializer", ByteArraySerializer.class.getName());
+
+        // create the producer
+        KafkaProducer<String, byte[]> producer = new KafkaProducer<>(properties);
+
+        // create a Producer Record
+        ProducerRecord<String, byte[]> producerRecord = new ProducerRecord<>(topic, imgName, fileBytes);
+
+        System.out.println("Sending image " + imgName + " to topic " + topic);
+        producer.send(producerRecord);
+        producer.flush();
+        producer.close();
+    }
+
+    private static byte[] readBytesFromFile(String filePath) throws IOException {
+        Path path = Paths.get(filePath);
+        return Files.readAllBytes(path);
+    }
+
     public static void main(String[] args) {
         log.info("I am a Kafka Consumer!");
+
+
+        Thread imageRequestThread = new Thread(() -> imageRequestHandler());
+        imageRequestThread.start();
 
         double myFreeSpaceSSD = StorageCapacity.getFreeSpaceSSD();
         double myFreeSpaceHDD = StorageCapacity.getFreeSpaceHDD();
         double myFreeSpace = myFreeSpaceSSD != 0 ? myFreeSpaceSSD : myFreeSpaceHDD;
         boolean isSSD = myFreeSpaceSSD != 0 ? true : false;
 
-        String topicName = "storagenode_1";
 
         final String SERVER_HOST = "10.70.47.171";
         final int SERVER_PORT = 12344;
@@ -77,16 +170,10 @@ public class ImageConsumer {
         ObjectOutputStream objectOutputStream = null;
 
         try {
-            // Create a Socket outside the try-with-resources block
+
             socket = new Socket(SERVER_HOST, SERVER_PORT);
-
-            // Create an ObjectOutputStream outside the try-with-resources block
             objectOutputStream = new ObjectOutputStream(socket.getOutputStream());
-
-            // Create a Packet object to send
             ProfilePacket packetToSend = new ProfilePacket(topicName, myFreeSpace, isSSD);
-
-            // Send the Packet to the server
             objectOutputStream.writeObject(packetToSend);
 
             System.out.println("Packet sent to server.");
@@ -94,8 +181,6 @@ public class ImageConsumer {
             BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             String message = reader.readLine();
             System.out.println("Received message from head node: " + message);
-
-            // Start a new thread for periodic message sending
             new PeriodicHeartBeatSender(socket, objectOutputStream).start();
 
             System.out.println("Periodic Heard Beat Sender thread started");
@@ -103,26 +188,13 @@ public class ImageConsumer {
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
-            // Close resources when they are no longer needed
 
         }
 
-
-
         /*
-        Thread threadPing = new Thread(new PingHeadNode());
-        threadPing.start();
-
-
-        /*
-         * Uncomment this only if this Storage Node is acting as the Backup Head Node
-        Thread threadMeta = new Thread(new HashMapConsumer());
-        threadMeta.start();
-        Thread threadBackup = new Thread(new ImageConsumerBackup());
-        threadBackup.start();
-        */
-
-
+        This is the receiving images from Group-1 part
+        Consume from my assigned topic and store it locally
+         */
         // create Consumer Properties
         Properties properties = new Properties();
         properties.setProperty("bootstrap.servers", ipAddress);
@@ -150,19 +222,9 @@ public class ImageConsumer {
 
                     // Process and save the image to a file
                     try {
-                        BufferedImage image = ImageIO.read(new ByteArrayInputStream(imageData));
-                        String path = record.key().substring(0, record.key().length() - 4);
-                        String token[] = path.split("/");
+                        String imagePath = "/Users/saket/Desktop/BITS_4-1/DSTN/Project/Codes/DSTN/rcv/" + record.key();
 
-                        path = "/Users/saket/Desktop/BITS_4-1/DSTN/Project/Codes/DSTN/rcv/";
-                        String imagePath;
-
-                        imagePath = path + token[token.length - 1] + "_recv.jpg";
-
-                        File outputFile = new File(imagePath);
-                        outputFile.createNewFile();
-
-                        ImageIO.write(image, "jpg", outputFile);
+                        FileUtils.writeByteArrayToFile(new File(imagePath), imageData);
                         log.info("Saved image to: " + imagePath);
                     } catch (IOException e) {
                         log.error("Error while processing or saving the image", e);

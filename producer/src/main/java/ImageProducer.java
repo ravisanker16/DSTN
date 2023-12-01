@@ -14,6 +14,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 import java.util.Properties;
 
 public class ImageProducer {
@@ -22,9 +23,11 @@ public class ImageProducer {
     public static void main(String[] args) {
 
         log.info("Image Produce");
-        String imgName[] = new String[]{"blr.jpg", "maa.jpg", "tvm.jpg"};
-        for (int i = 0; i < 3; i++) {
-            String path = "/Users/ravisanker/Documents/Acads/Academics_4_1/DSTN/Project/img/" + imgName[i];
+        ReadFiles.addFileNames();
+        List<String> imgName = ReadFiles.getFileNamesList();
+
+        for (int i = 0; i < imgName.size(); i++) {
+            String path = "/Users/ravisanker/Documents/Acads/Academics_4_1/DSTN/Project/img/" + imgName.get(i);
             File imageFile = new File(path);
             if (!imageFile.exists()) {
                 System.err.println("Image file does not exist at the specified path: " + path);
@@ -52,7 +55,7 @@ public class ImageProducer {
 
                 // create a Producer Record
                 String topic = "initial";
-                String key = imgName[i];
+                String key = imgName.get(i);
                 ProducerRecord<String, byte[]> producerRecord = new ProducerRecord<>(topic, key, data);
 
                 // send the record (asynchronous)

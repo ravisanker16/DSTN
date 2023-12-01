@@ -9,12 +9,15 @@ import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -23,14 +26,6 @@ import java.util.Properties;
 
 public class HeadNode {
 
-//    private static final String topicName[] = new String[]{
-//            "storage0",
-//            "storage1",
-//            "storage2",
-//            "storage0_backup",
-//            "storage1_backup",
-//            "storage2_backup"
-//    };
 
     private static int counter = 0;
 
@@ -131,7 +126,7 @@ public class HeadNode {
                     System.out.println("Waiting for Hearbeat signal from storage node " + currentStorageNodeCount);
                     //System.out.println("object input stream " + objectInputStream.);
                     // Receive the periodic Packet from the server
-                    System.out.println("Socket is connected?: " + clientSocket.isConnected());
+
                     //PeriodicHeartBeatPacket receivedPacket = (PeriodicHeartBeatPacket) objectInputStream.readObject();
                     PeriodicHeartBeatPacket recvpacket = (PeriodicHeartBeatPacket) objectInputStream.readObject();
 
@@ -170,13 +165,209 @@ public class HeadNode {
                     System.err.println("Error creating Kafka topic. Exit code: " + exitCode);
                 }
             } catch (IOException | InterruptedException e) {
-                System.out.println("ulsfjlksjfklshjf");
                 e.printStackTrace();
             }
-            System.out.println("kfhjdskjhfs");
         }
 
     }
+
+
+    static class ImageRequestLookout extends Thread {
+
+
+        public ImageRequestLookout() {
+
+        }
+
+        @Override
+        public void run() {
+
+            Thread fetchImage = new Thread(() -> fetchImageHandler());
+            fetchImage.start();
+
+            String topicName = "request-topic";
+            Properties properties = new Properties();
+            properties.setProperty("bootstrap.servers", ipAddress);
+            properties.setProperty("key.deserializer", StringDeserializer.class.getName());
+            properties.setProperty("value.deserializer", StringDeserializer.class.getName());
+            properties.setProperty("group.id", groupId);
+            properties.setProperty("auto.offset.reset", "latest");
+
+            // create a consumer
+            KafkaConsumer<String, String> consumer = new KafkaConsumer<>(properties);
+
+            // subscribe to the topic
+            consumer.subscribe(Arrays.asList(topicName));
+
+            try {
+                // poll for data
+                while (true) {
+                    ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(1000));
+
+                    for (ConsumerRecord<String, String> record : records) {
+                        log.info("Received request for image: " + record.value());
+
+                        // requested image name
+                        String reqImageName = record.value();
+
+
+                        try {
+                            // find which storage node has the image
+                            String fileName = "metadata.json";
+                            String keyToFind = reqImageName;
+
+
+                            int value = findValueForKey(fileName, keyToFind);
+                            if (value != Integer.MIN_VALUE) {
+                                System.out.println("Value for key '" + keyToFind + "': " + value);
+                            } else {
+                                System.out.println("Error: Key '" + keyToFind + "' not found in the JSON file or not an integer.");
+                            }
+
+                            // send the request to the common topic "img-req-from-storage-node"
+                            sendImageRequestToCommonTopic(keyToFind, value);
+
+                        } catch (IOException e) {
+                            log.error("Error while processing or saving the image", e);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.error("Unexpected exception in the consumer", e);
+            } finally {
+                consumer.close(); // close the consumer
+                log.info("The consumer is now gracefully shut down");
+            }
+
+        }
+
+
+        // Function to find the value for a given key in a JSON file
+        private static int findValueForKey(String fileName, String keyToFind) throws Exception {
+            // Read the JSON file content into a string
+            String content = new String(Files.readAllBytes(Paths.get(fileName)));
+
+            // Parse the JSON string into a JSONObject
+            JSONObject json = new JSONObject(content);
+
+            // Check if the key exists in the JSON object
+            if (json.has(keyToFind)) {
+                // Retrieve the integer value associated with the key
+                return json.getInt(keyToFind);
+            } else {
+                return Integer.MIN_VALUE; // Key not found or not an integer
+            }
+        }
+
+        private static void fetchImageHandler() {
+            // read the byte array from the common topic "img-from-storage-node"
+            String topic = "img-from-storage-node";
+            Properties properties = new Properties();
+            properties.setProperty("bootstrap.servers", ipAddress);
+            properties.setProperty("key.deserializer", StringDeserializer.class.getName());
+            properties.setProperty("value.deserializer", ByteArrayDeserializer.class.getName());
+            properties.setProperty("group.id", groupId);
+            properties.setProperty("auto.offset.reset", "latest");
+
+            KafkaConsumer<String, byte[]> consumer = new KafkaConsumer<>(properties);
+            consumer.subscribe(Arrays.asList(topic));
+
+            try {
+                // poll for data
+                while (true) {
+                    ConsumerRecords<String, byte[]> records = consumer.poll(Duration.ofMillis(1000));
+                    for (ConsumerRecord<String, byte[]> record : records) {
+                        // send the image to the common topic "image-topic"
+                        String topicToSendTo = "image-topic";
+
+                        // Assuming the value is an image byte array (JPEG format)
+                        byte[] imageData = record.value();
+                        String path = record.key();
+
+                        // Send this data to the appropriate topic
+                        properties.setProperty("bootstrap.servers", ipAddress);
+
+                        // set producer properties
+                        properties.setProperty("key.serializer", StringSerializer.class.getName());
+                        properties.setProperty("value.serializer", ByteArraySerializer.class.getName());
+
+                        // create the producer
+                        KafkaProducer<String, byte[]> producer = new KafkaProducer<>(properties);
+
+
+                        // create a Producer Record
+                        ProducerRecord<String, byte[]> producerRecord = new ProducerRecord<>(topicToSendTo, path, imageData);
+
+                        // send the record (asynchronous) to storage
+                        System.out.println("Sending byte array for image " + path + " to topic " + topicToSendTo);
+                        producer.send(producerRecord);
+                        producer.flush();
+                        producer.close();
+                    }
+
+
+                }
+            } catch (Exception e) {
+                log.error("Unexpected exception in the head node", e);
+            } finally {
+                consumer.close();
+                log.info("The head node is now gracefully shut down");
+            }
+
+
+        }
+
+        private static void sendImageRequestToCommonTopic(String imgName, int storageNode) {
+            String topic = "img-req-from-storage-node";
+
+            // create Consumer Properties
+            Properties properties = new Properties();
+
+            // connect to Kafka broker(s)
+            properties.setProperty("bootstrap.servers", ipAddress);
+            properties.setProperty("group.id", groupId);
+            properties.setProperty("auto.offset.reset", "latest");
+            properties.setProperty("key.serializer", StringSerializer.class.getName());
+            properties.setProperty("value.serializer", ByteArraySerializer.class.getName());
+
+            // create the producer
+            KafkaProducer<String, String> producer = new KafkaProducer<>(properties);
+
+            // create a Producer Record
+            ProducerRecord<String, String> producerRecord = new ProducerRecord<>(topic, imgName, storageNodeNumberToTopicName.get(storageNode));
+
+            System.out.println("Sending request for image " + imgName + " to topic " + topic);
+            producer.send(producerRecord);
+            producer.flush();
+            producer.close();
+        }
+
+        private static void readRequestedImageFromCommonTopic(String imgName, String storageNode) {
+            String topic = "img-req-from-storage-node";
+
+            // create Consumer Properties
+            Properties properties = new Properties();
+
+            // connect to Kafka broker(s)
+            properties.setProperty("bootstrap.servers", ipAddress);
+            properties.setProperty("group.id", groupId);
+            properties.setProperty("auto.offset.reset", "latest");
+            properties.setProperty("key.serializer", StringSerializer.class.getName());
+            properties.setProperty("value.serializer", ByteArraySerializer.class.getName());
+
+            // create the producer
+            KafkaProducer<String, String> producer = new KafkaProducer<>(properties);
+
+            // create a Producer Record
+            ProducerRecord<String, String> producerRecord = new ProducerRecord<>(topic, imgName, storageNodeNumberToTopicName.get(storageNode));
+
+            System.out.println("Sending request for image " + imgName + " to topic " + topic);
+            producer.send(producerRecord);
+            producer.flush();
+            producer.close();
+        }
+    }
+
 
     public static void main(String[] args) {
         log.info("I am the Head Node!");
@@ -219,6 +410,10 @@ public class HeadNode {
                 ConsumerRecords<String, byte[]> records = consumer.poll(Duration.ofMillis(1000));
 
                 for (ConsumerRecord<String, byte[]> record : records) {
+                    if (maxHeapStorageSpace.isEmpty()) {
+                        System.out.println("How do you expect to have a distributed system with 0 Nodes???");
+                        return;
+                    }
                     StorageNodeTuple topTuple = maxHeapStorageSpace.poll();
                     String topicToSendTo = storageNodeNumberToTopicName.get(topTuple.getStorageNodeNumber());
 
@@ -245,12 +440,19 @@ public class HeadNode {
                     ProducerRecord<String, byte[]> producerRecord = new ProducerRecord<>(topicToSendTo, path, imageData);
 
                     // send the record (asynchronous) to storage
+                    System.out.println("Sending image " + path + " to topic " + topicToSendTo);
                     producer.send(producerRecord);
 
                     // send the backup
+                    if (maxHeapStorageSpace.isEmpty()) {
+                        System.out.println("How do you expect to have a distributed system with 1 Node???");
+                        return;
+                    }
+
                     StorageNodeTuple topTupleForBackup = maxHeapStorageSpace.poll();
                     String topicToSendBackupTo = storageNodeNumberToTopicName.get(topTupleForBackup.getStorageNodeNumber());
                     producerRecord = new ProducerRecord<>(topicToSendBackupTo, path, imageData);
+                    System.out.println("Sending backup image " + path + " to topic " + topicToSendBackupTo);
                     producer.send(producerRecord);
 
                     // update the priority queue
@@ -332,3 +534,4 @@ public class HeadNode {
         return sz / (1024.0 * 1024 * 1024);
     }
 }
+
