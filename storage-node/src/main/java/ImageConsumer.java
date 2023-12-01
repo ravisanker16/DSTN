@@ -46,7 +46,8 @@ public class ImageConsumer {
                     try {
                         // Create a new Packet object for periodic sending
                         PeriodicHeartBeatPacket periodicPacket = new PeriodicHeartBeatPacket("alive");
-
+                        // get current profile
+                        periodicPacket.addProfile();
                         // Send the periodic Packet to the server
                         objectOutputStream.writeObject(periodicPacket);
 
