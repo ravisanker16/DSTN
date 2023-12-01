@@ -1,7 +1,3 @@
-/*
- * produce 3 images to the 'initial' topic
- */
-
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
@@ -9,11 +5,12 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayOutputStream;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Properties;
 
@@ -23,11 +20,12 @@ public class ImageProducer {
     public static void main(String[] args) {
 
         log.info("Image Produce");
-        ReadFiles.addFileNames();
+        ReadFiles.addFileNames(10);
         List<String> imgName = ReadFiles.getFileNamesList();
+        writeListToFile(imgName, "/Users/ravisanker/Documents/Acads/Academics_4_1/DSTN/Project/imgSent/");
 
         for (int i = 0; i < imgName.size(); i++) {
-            String path = "/Users/ravisanker/Documents/Acads/Academics_4_1/DSTN/Project/img/" + imgName.get(i);
+            String path = "/Users/ravisanker/Desktop/row_wise/" + imgName.get(i);
             File imageFile = new File(path);
             if (!imageFile.exists()) {
                 System.err.println("Image file does not exist at the specified path: " + path);
@@ -37,10 +35,8 @@ public class ImageProducer {
             }
             // read image
             try {
-                BufferedImage bImage = ImageIO.read(new File(path));
-                ByteArrayOutputStream bos = new ByteArrayOutputStream();
-                ImageIO.write(bImage, "jpeg", bos);
-                byte[] data = bos.toByteArray();
+
+                byte[] data = readFileToByteArray(path);
 
                 // create producer properties
                 Properties properties = new Properties();
@@ -71,5 +67,24 @@ public class ImageProducer {
             }
         }
 
+    }
+
+    public static void writeListToFile(List<String> lines, String filePath) {
+        Path path = Paths.get(filePath);
+
+        try (BufferedWriter writer = Files.newBufferedWriter(path)) {
+            // Write each line from the list to the file
+            for (String line : lines) {
+                writer.write(line);
+                writer.newLine(); // Add a newline after each line
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static byte[] readFileToByteArray(String filePath) throws IOException {
+        Path path = Paths.get(filePath);
+        return Files.readAllBytes(path);
     }
 }

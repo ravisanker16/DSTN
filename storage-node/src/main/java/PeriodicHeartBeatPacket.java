@@ -1,4 +1,5 @@
 import java.io.*;
+import java.util.ArrayList;
 import java.util.List;
 
 
@@ -11,7 +12,7 @@ public class PeriodicHeartBeatPacket implements Serializable {
     public PeriodicHeartBeatPacket(String message, List<String> latestImagesReceieved) {
         this.message = message;
         this.memFreePerc = 0;
-        this.latestImagesReceieved = latestImagesReceieved;
+        this.latestImagesReceieved = new ArrayList<>(latestImagesReceieved);
 
     }
 
@@ -24,7 +25,7 @@ public class PeriodicHeartBeatPacket implements Serializable {
     }
 
     public void setLatestImages(List<String> stringList) {
-        this.latestImagesReceieved = stringList;
+        this.latestImagesReceieved = new ArrayList<>(stringList);
     }
 
     public void addString(String newString) {

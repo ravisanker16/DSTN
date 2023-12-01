@@ -20,6 +20,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.*;
 
 public class HeadNode {
 
@@ -42,6 +43,8 @@ public class HeadNode {
 
     private static PriorityQueue<StorageNodeTuple> maxHeapStorageSpace = new PriorityQueue<>();
     private static HashMap<Integer, Boolean> validityStorageNode = new HashMap<>();
+
+    private static HashMap<String, Long> requestTimeStampMap = new HashMap<>();
 
     /*
      * This is for the head node looking out for more storage nodes to join
@@ -83,11 +86,19 @@ public class HeadNode {
                 System.out.println("Received topic name: " + packet.getTopicName());
                 System.out.println("Received free space: " + packet.getFreeSpace());
                 System.out.println("Received isSSD: " + packet.isSSD());
+                System.out.println("Received firstTime: " + packet.getFirstTime());
+
 
                 if (topicNameToStorageNodeNumber.containsKey(packet.getTopicName())) {
                     try {
                         PrintWriter writer = new PrintWriter(clientSocket.getOutputStream(), true);
-                        writer.println("Topic already exists! Choose another topic name.");
+
+                        if (packet.getFirstTime() == false) {
+                            validityStorageNode.put(topicNameToStorageNodeNumber.get(packet.getTopicName()), true);
+                            writer.println("Topic exists. You have been validated");
+                        } else {
+                            writer.println("Topic already exists! Choose another topic name.");
+                        }
 
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -118,14 +129,46 @@ public class HeadNode {
                 System.out.println("priority queue <space, number, isSSD>: " + maxHeapStorageSpace);
 
 
-                while (true) {
-                    System.out.println("Waiting for Hearbeat signal from storage node " + currentStorageNodeCount);
-                    PeriodicHeartBeatPacket recvpacket = (PeriodicHeartBeatPacket) objectInputStream.readObject();
-                    System.out.println("Received periodic heartbeat message from storage node " + currentStorageNodeCount + ": " + recvpacket.getMessage());
+                ExecutorService executorService = Executors.newSingleThreadExecutor();
 
-                    for (String imgName : recvpacket.getLatestImagesList()) {
-                        updateMetaData(imgName, currentStorageNodeCount);
-                    }
+                try {
+                    // Execute the blocking task with a timeout of 1 minute and 5 seconds
+                    Future<Void> future = executorService.submit(() -> {
+
+                        while (true) {
+                            /*
+                             * Waiting for the hearbeat from storage node
+                             * Invalidate if not received within 1 min 5 s
+                             * */
+                            System.out.println("Waiting for Hearbeat signal from storage node " + currentStorageNodeCount);
+                            PeriodicHeartBeatPacket recvpacket = (PeriodicHeartBeatPacket) objectInputStream.readObject();
+
+                            System.out.println("Received periodic heartbeat message from storage node " + currentStorageNodeCount + ": " + recvpacket.getMessage());
+                            System.out.println(recvpacket.getLatestImagesList().size() + " images received by " + currentStorageNodeCount);
+
+                            for (String imgName : recvpacket.getLatestImagesList()) {
+                                System.out.println("Image " + imgName + "received by storage node " + currentStorageNodeCount);
+                                updateMetaData(imgName, currentStorageNodeCount);
+                            }
+
+                        }
+
+                    });
+                    future.get(65, TimeUnit.SECONDS);
+
+                } catch (TimeoutException e) {
+                    System.out.println("Timeout occurred. Exiting the loop.");
+                    System.out.println("Invalidating storage node number: " + currentStorageNodeCount);
+                    validityStorageNode.put(currentStorageNodeCount, false);
+
+                } catch (InterruptedException | ExecutionException e) {
+                    System.out.println("Something went wrong with storage node number: " + currentStorageNodeCount);
+                    System.out.println("Invalidating storage node number: " + currentStorageNodeCount);
+                    validityStorageNode.put(currentStorageNodeCount, false);
+                    // e.printStackTrace();
+
+                } finally {
+                    executorService.shutdown();
                 }
 
             } catch (IOException | ClassNotFoundException e) {
@@ -187,6 +230,7 @@ public class HeadNode {
      * */
     static class ImageRequestLookout extends Thread {
 
+        private static String metaDataFileName = "metadata.json";
 
         public ImageRequestLookout() {
 
@@ -202,6 +246,9 @@ public class HeadNode {
              * */
             Thread fetchImage = new Thread(() -> fetchImageHandler());
             fetchImage.start();
+
+            Thread checkImageRequestTimeoutThread = new Thread(() -> checkImageRequestTimeout());
+            checkImageRequestTimeoutThread.start();
 
             String topicName = "request-topic";
             Properties properties = new Properties();
@@ -231,20 +278,21 @@ public class HeadNode {
 
                         try {
                             // find which storage node has the image
-                            String fileName = "metadata.json";
-                            String keyToFind = reqImageName;
 
 
-                            int value = findValueForKey(fileName, keyToFind);
+                            StringBuilder keyToFind = new StringBuilder(reqImageName);
+
+
+                            int value = findValueForKey(metaDataFileName, keyToFind);
                             if (value != Integer.MIN_VALUE) {
-                                System.out.println("Value for key '" + keyToFind + "': " + value);
+                                System.out.println("Value for key '" + keyToFind.toString() + "': " + value);
                             } else {
-                                System.out.println("Error: Key '" + keyToFind + "' not found in the JSON file or not an integer.");
+                                System.out.println("Error: Key '" + keyToFind.toString() + "' not found in the JSON file or not an integer.");
                                 continue;
                             }
 
                             // send the request to the common topic "img-req-from-storage-node"
-                            sendImageRequestToCommonTopic(keyToFind, value);
+                            sendImageRequestToCommonTopic(keyToFind.toString(), value);
 
                         } catch (IOException e) {
                             log.error("Error while processing or saving the image", e);
@@ -262,18 +310,23 @@ public class HeadNode {
 
 
         // Function to find the value for a given key in a JSON file
-        private static int findValueForKey(String fileName, String keyToFind) throws Exception {
+        private static int findValueForKey(String fileName, StringBuilder keyToFind) throws Exception {
             // Read the JSON file content into a string
             String content = new String(Files.readAllBytes(Paths.get(fileName)));
 
             // Parse the JSON string into a JSONObject
             JSONObject json = new JSONObject(content);
 
+
             // Check if the key exists in the JSON object
-            if (json.has(keyToFind)) {
+            if (json.has(keyToFind.toString()) && validityStorageNode.get(json.getInt(keyToFind.toString()))) {
                 // Retrieve the integer value associated with the key
-                return json.getInt(keyToFind);
+                return json.getInt(keyToFind.toString());
             } else {
+                keyToFind.insert(0, "backup_");
+                if (json.has(keyToFind.toString()) && validityStorageNode.get(json.getInt(keyToFind.toString()))) {
+                    return json.getInt(keyToFind.toString());
+                }
                 return Integer.MIN_VALUE; // Key not found or not an integer
             }
         }
@@ -303,6 +356,12 @@ public class HeadNode {
                         byte[] imageData = record.value();
                         String path = record.key();
 
+                        if (requestTimeStampMap.containsKey(path))
+                            requestTimeStampMap.remove(path);
+
+                        if (path.startsWith("backup_")) {
+                            path = path.substring("backup_".length());
+                        }
                         // Send this data to the appropriate topic
                         properties.setProperty("bootstrap.servers", ipAddress);
 
@@ -357,8 +416,33 @@ public class HeadNode {
 
             System.out.println("Sending request for image " + imgName + " to topic " + topic);
             producer.send(producerRecord);
+            requestTimeStampMap.put(imgName, System.currentTimeMillis());
             producer.flush();
             producer.close();
+        }
+
+        private static void checkImageRequestTimeout() {
+            long timeoutMilliSeconds = 60000; // 60s
+            long curTime = System.currentTimeMillis();
+            for (String key : requestTimeStampMap.keySet()) {
+                if (curTime - requestTimeStampMap.get(key) >= timeoutMilliSeconds) {
+                    StringBuilder keyToFind = new StringBuilder(key);
+                    int value = Integer.MIN_VALUE;
+                    try {
+                        value = findValueForKey(metaDataFileName, keyToFind);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                    if (value != Integer.MIN_VALUE) {
+                        System.out.println("Value for key '" + keyToFind.toString() + "': " + value);
+                    } else {
+                        System.out.println("Error: Key '" + keyToFind.toString() + "' not found in the JSON file or not an integer.");
+                        continue;
+                    }
+                    sendImageRequestToCommonTopic(keyToFind.toString(), value);
+                    requestTimeStampMap.put(key, curTime);
+                }
+            }
         }
 
 

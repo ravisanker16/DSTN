@@ -11,26 +11,26 @@ public class ReadFiles {
         return fileNamesList;
     }
 
-    public static void printFileNames(File[] a, int i, int lvl) {
-        if (i == a.length) {
+    public static void printFileNames(File[] a, int i, int count) {
+        if (i == a.length || count < 0) {
             return;
         }
-        if (a[i].isFile() && a[i].getName() != ".DS_Store") {
+        if (a[i].isFile()) {
             // Instead of printing, add file name to the list
             fileNamesList.add(a[i].getName());
         }
-        printFileNames(a, i + 1, lvl);
+        printFileNames(a, i + 1, count - 1);
     }
 
     // Main Method
-    public static void addFileNames() {
-        String path = "/Users/ravisanker/Documents/Acads/Academics_4_1/DSTN/Project/img";
+    public static void addFileNames(int numberOfFiles) {
+        String path = "/Users/ravisanker/Desktop/row_wise";
         File fObj = new File(path);
         ReadFiles obj = new ReadFiles();
         if (fObj.exists() && fObj.isDirectory()) {
             File a[] = fObj.listFiles();
 
-            obj.printFileNames(a, 0, 0);
+            obj.printFileNames(a, 0, numberOfFiles);
 
             // Accessing the file names list using getters
             List<String> fileNames = obj.getFileNamesList();
@@ -42,4 +42,10 @@ public class ReadFiles {
             }
         }
     }
+
+//    public static void main(String[] args) {
+//
+//        ReadFiles.addFileNames(10);
+//        List<String> imgName = getFileNamesList();
+//    }
 }
