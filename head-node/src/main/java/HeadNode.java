@@ -149,9 +149,7 @@ public class HeadNode {
                 topicNameToStorageNodeNumber.put(packet.getTopicName(), currentStorageNodeCount);
 
                 // Assuming 50% memory available and readWriteSpeed at 2 GB/s initially
-                maxHeapStorageSpace.add(new
-
-                        StorageNodeTuple(packet.getFreeSpace(), 0.0, 50.0, 2.0, packet.isSSD(), currentStorageNodeCount));
+                maxHeapStorageSpace.add(new StorageNodeTuple(packet.getFreeSpace(), 0.0, 50.0, 2.0, packet.isSSD(), currentStorageNodeCount));
 
 
                 System.out.println("storage node number to topic name: " + storageNodeNumberToTopicName);
@@ -346,22 +344,6 @@ public class HeadNode {
         // Function to find the value for a given key in a JSON file
         private static int findValueForKey(String fileName, StringBuilder keyToFind) throws Exception {
             // Read the JSON file content into a string
-//            String content = new String(Files.readAllBytes(Paths.get(fileName)));
-//            JSONObject json = new JSONObject(content);
-//            if (json.has(keyToFind.toString()) &&
-//                    validityStorageNode.containsKey(json.getInt(keyToFind.toString())) &&
-//                    validityStorageNode.get(json.getInt(keyToFind.toString()))) {
-//                // Retrieve the integer value associated with the key
-//                return json.getInt(keyToFind.toString());
-//            } else {
-//                keyToFind.insert(0, "backup_");
-//                if (json.has(keyToFind.toString()) &&
-//                        validityStorageNode.containsKey(json.getInt(keyToFind.toString()))
-//                        && validityStorageNode.get(json.getInt(keyToFind.toString()))) {
-//                    return json.getInt(keyToFind.toString());
-//                }
-//                return Integer.MIN_VALUE; // Key not found or not an integer
-//            }
 
             try {
                 ObjectMapper objectMapper = new ObjectMapper();
@@ -521,8 +503,78 @@ public class HeadNode {
     }
 
 
+    public static class StorageManager {
+
+        private static final String FILE_PATH = "/Users/ravisanker/Documents/Acads/Academics_4_1/DSTN/Project/persistent/storage_data.ser";
+
+        // Function to save data structures to a file
+        public static void saveData() {
+            try (ObjectOutputStream outputStream = new ObjectOutputStream(new FileOutputStream(FILE_PATH))) {
+                // Save all data structures
+                outputStream.writeObject(storageNodeNumberToTopicName);
+                outputStream.writeObject(topicNameToStorageNodeNumber);
+                outputStream.writeObject(maxHeapStorageSpace);
+                outputStream.writeObject(validityStorageNode);
+                outputStream.writeObject(requestTimeStampMap);
+
+                System.out.println("Data saved successfully.");
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        // Function to load data structures from a file
+        public static void loadData() {
+            try (ObjectInputStream inputStream = new ObjectInputStream(new FileInputStream(FILE_PATH))) {
+                // Load data structures
+                storageNodeNumberToTopicName = (HashMap<Integer, String>) inputStream.readObject();
+                topicNameToStorageNodeNumber = (HashMap<String, Integer>) inputStream.readObject();
+                maxHeapStorageSpace = (PriorityQueue<StorageNodeTuple>) inputStream.readObject();
+                validityStorageNode = (HashMap<Integer, Boolean>) inputStream.readObject();
+                requestTimeStampMap = (HashMap<String, Long>) inputStream.readObject();
+
+                System.out.println("Data loaded successfully.");
+            } catch (FileNotFoundException e) {
+                System.out.println("File not found. Initializing with default values.");
+                initializeDefaultData();  // Add a function to initialize default values if needed
+            } catch (IOException | ClassNotFoundException e) {
+                e.printStackTrace();
+            }
+        }
+
+        private static void initializeDefaultData() {
+            storageNodeNumberToTopicName = new HashMap<>();
+            topicNameToStorageNodeNumber = new HashMap<>();
+            maxHeapStorageSpace = new PriorityQueue<>();
+            validityStorageNode = new HashMap<>();
+            requestTimeStampMap = new HashMap<>();
+
+            System.out.println("Default data initialized.");
+        }
+
+
+    }
+
+    public static void saveDataHandler() {
+        Timer timer = new Timer();
+
+        // Schedule the task to run every 30 seconds (30000 milliseconds)
+        timer.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                StorageManager.saveData();
+            }
+        }, 0, 30000);
+
+    }
+
     public static void main(String[] args) {
         log.info("I am the Head Node!");
+        StorageManager.loadData();
+
+        Thread saveDataThread = new Thread(() -> saveDataHandler());
+        saveDataThread.start();
+
 
         // ConfigFileUpdater.updateServerProperties();
 

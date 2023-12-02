@@ -1,4 +1,6 @@
-class StorageNodeTuple implements Comparable<StorageNodeTuple> {
+import java.io.Serializable;
+
+class StorageNodeTuple implements Comparable<StorageNodeTuple>, Serializable {
     /*
         w1 * x1 + w2 * x2
         w1 = wtSpace
@@ -57,11 +59,17 @@ class StorageNodeTuple implements Comparable<StorageNodeTuple> {
         return storageNodeNumber;
     }
 
-    public double getBytesSent(){ return bytesSent; }
+    public double getBytesSent() {
+        return bytesSent;
+    }
 
-    public double getMemFreePerc(){ return memFreePerc; }
+    public double getMemFreePerc() {
+        return memFreePerc;
+    }
 
-    public double getReadWrite(){ return readWrite; }
+    public double getReadWrite() {
+        return readWrite;
+    }
 
 
     public boolean isSSD() {
@@ -78,7 +86,7 @@ class StorageNodeTuple implements Comparable<StorageNodeTuple> {
 
     public void setTotalWeight() {
         this.totWeightNode = wtStorageSpace * storageSpace + wtBytesSent * bytesSent + wtmemFreePerc * memFreePerc
-        + wtReadWrite * readWrite;
+                + wtReadWrite * readWrite;
     }
 
 
