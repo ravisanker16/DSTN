@@ -8,11 +8,16 @@ class StorageNodeTuple implements Comparable<StorageNodeTuple> {
      */
 
 
-    private double wtSpace; // function of isSSD
+    private double wtStorageSpace; // function of isSSD
     private double wtBytesSent;
 
+    private double wtReadWrite;
+    private double wtmemFreePerc;
     private double storageSpace;
     private double bytesSent;
+
+    private double memFreePerc;
+    private double readWrite;
     private boolean isSSD;
     private int storageNodeNumber;
 
@@ -20,15 +25,20 @@ class StorageNodeTuple implements Comparable<StorageNodeTuple> {
 
     private final int ratio = 2;
 
-    public StorageNodeTuple(double storageSpace, boolean isSSD, int storageNodeNumber) {
+    public StorageNodeTuple(double storageSpace, double bytesSent, double memFreePerc, double readWrite, boolean isSSD, int storageNodeNumber) {
         this.storageSpace = storageSpace;
+        this.bytesSent = bytesSent;
+        this.memFreePerc = memFreePerc;
+        this.readWrite = readWrite;
         this.isSSD = isSSD;
         this.storageNodeNumber = storageNodeNumber;
-        this.bytesSent = 0;
-        this.wtSpace = isSSD ? 0.5 : 0.3;
-        this.wtBytesSent = -2 * (1 / (1024 * 1024 * 1024));
+        this.wtStorageSpace = isSSD ? 0.5 : 0.3;
+        this.wtBytesSent = -2 * (1 / (1024 * 1024 * 1024)); // CHANGE!!!
+        this.wtmemFreePerc = 0.2;
+        this.wtReadWrite = 0.2;
         setTotalWeight();
     }
+
 
     // Implement compareTo method for Comparable interface
     @Override
@@ -47,6 +57,13 @@ class StorageNodeTuple implements Comparable<StorageNodeTuple> {
         return storageNodeNumber;
     }
 
+    public double getBytesSent(){ return bytesSent; }
+
+    public double getMemFreePerc(){ return memFreePerc; }
+
+    public double getReadWrite(){ return readWrite; }
+
+
     public boolean isSSD() {
         return isSSD;
     }
@@ -60,7 +77,8 @@ class StorageNodeTuple implements Comparable<StorageNodeTuple> {
     }
 
     public void setTotalWeight() {
-        this.totWeightNode = wtSpace * storageSpace + wtBytesSent * bytesSent;
+        this.totWeightNode = wtStorageSpace * storageSpace + wtBytesSent * bytesSent + wtmemFreePerc * memFreePerc
+        + wtReadWrite * readWrite;
     }
 
 

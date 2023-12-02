@@ -74,6 +74,28 @@ public class HeadNode {
             }
         }
 
+        public static StorageNodeTuple pollFromPriorityQueue(int storageNode){
+            Iterator<StorageNodeTuple> iterator = maxHeapStorageSpace.iterator();
+
+            while (iterator.hasNext()) {
+                StorageNodeTuple tuple = iterator.next();
+                if (tuple.getStorageNodeNumber() == storageNode) {
+                    iterator.remove(); // Remove the element from the priority queue
+                    return tuple; // Return the removed element
+                }
+            }
+
+            return null; // Element not found
+        }
+        public static void updatePriorityQueue(int currentStorageNodeCount, PeriodicHeartBeatPacket recvPacket){
+            StorageNodeTuple removeTuple = pollFromPriorityQueue(currentStorageNodeCount);
+            if(removeTuple == null){
+                System.out.println("Periodic Removal Tuple for node: " + currentStorageNodeCount + "not Found!!!");
+                return;
+            }
+            StorageNodeTuple updatedTuple = new StorageNodeTuple(removeTuple.getStorageSpace(), removeTuple.getBytesSent(), recvPacket.getMemFreePerc(), (recvPacket.getReadSpeed()+recvPacket.getWriteSpeed())/2.0, removeTuple.isSSD(), removeTuple.getStorageNodeNumber());
+            maxHeapStorageSpace.add(updatedTuple);
+        }
         private static void handleClient(Socket clientSocket) {
             try (ObjectInputStream objectInputStream = new ObjectInputStream(clientSocket.getInputStream())) {
                 // Read the Packet object from the client
@@ -122,7 +144,8 @@ public class HeadNode {
                 storageNodeNumberToTopicName.put(currentStorageNodeCount, packet.getTopicName());
                 topicNameToStorageNodeNumber.put(packet.getTopicName(), currentStorageNodeCount);
 
-                maxHeapStorageSpace.add(new StorageNodeTuple(packet.getFreeSpace(), packet.isSSD(), currentStorageNodeCount));
+                // Assuming 50% memory available and readWriteSpeed at 2 GB/s initially
+                maxHeapStorageSpace.add(new StorageNodeTuple(packet.getFreeSpace(), 0.0, 50.0, 2.0, packet.isSSD(), currentStorageNodeCount));
 
 
                 System.out.println("storage node number to topic name: " + storageNodeNumberToTopicName);
@@ -142,7 +165,7 @@ public class HeadNode {
                              * */
                             System.out.println("Waiting for Hearbeat signal from storage node " + currentStorageNodeCount);
                             PeriodicHeartBeatPacket recvpacket = (PeriodicHeartBeatPacket) objectInputStream.readObject();
-
+                            updatePriorityQueue(currentStorageNodeCount, recvpacket);
                             System.out.println("Received periodic heartbeat message from storage node " + currentStorageNodeCount + ": " + recvpacket.getMessage());
                             System.out.println(recvpacket.getLatestImagesList().size() + " images received by " + currentStorageNodeCount);
 
@@ -575,13 +598,14 @@ public class HeadNode {
                     System.out.println("Sending backup image " + path + " to topic " + topicToSendBackupTo);
                     producer.send(producerRecord);
 
-                    // update the priority queue
                     double updatedSpace = topTuple.getStorageSpace() - getSpaceInGB(imageData);
-                    StorageNodeTuple updatedTuple = new StorageNodeTuple(topTuple.getStorageSpace(), topTuple.isSSD(), topTuple.getStorageNodeNumber());
+                    double updatedBytesSent = topTuple.getBytesSent() + getSpaceInGB(imageData);
+                    StorageNodeTuple updatedTuple = new StorageNodeTuple(updatedSpace, updatedBytesSent, topTuple.getMemFreePerc(), topTuple.getReadWrite(), topTuple.isSSD(), topTuple.getStorageNodeNumber());  // CHANGED to updatedSpace!!!
                     maxHeapStorageSpace.add(updatedTuple);
 
                     updatedSpace = topTupleForBackup.getStorageSpace() - getSpaceInGB(imageData);
-                    updatedTuple = new StorageNodeTuple(topTupleForBackup.getStorageSpace(), topTupleForBackup.isSSD(), topTupleForBackup.getStorageNodeNumber());
+                    updatedBytesSent = topTupleForBackup.getBytesSent() + getSpaceInGB(imageData);
+                    updatedTuple = new StorageNodeTuple(updatedSpace, updatedBytesSent, topTupleForBackup.getMemFreePerc(), topTupleForBackup.getReadWrite(), topTupleForBackup.isSSD(), topTupleForBackup.getStorageNodeNumber());  // CHANGED to updatedSpace!!!
                     maxHeapStorageSpace.add(updatedTuple);
 
 
