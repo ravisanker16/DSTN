@@ -20,6 +20,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class ImageConsumer {
     private static final String ipAddress = "10.70.47.171:9092";
@@ -41,10 +44,12 @@ public class ImageConsumer {
     private static class PeriodicHeartBeatSender extends Thread {
         private final Socket socket;
         private final ObjectOutputStream objectOutputStream;
+        private final ObjectInputStream objectInputStream;
 
-        public PeriodicHeartBeatSender(Socket socket, ObjectOutputStream objectOutputStream) {
+        public PeriodicHeartBeatSender(Socket socket, ObjectOutputStream objectOutputStream, ObjectInputStream objectInputStream) {
             this.socket = socket;
             this.objectOutputStream = objectOutputStream;
+            this.objectInputStream = objectInputStream;
         }
 
         @Override
@@ -63,7 +68,37 @@ public class ImageConsumer {
                         objectOutputStream.writeObject(periodicPacket);
                         latestImagesReceived.clear();
                         System.out.println("Periodic packet sent to server.");
+                        System.out.println("Waiting for ack from head node");
+
+                        ScheduledExecutorService executorService = Executors.newScheduledThreadPool(1);
+
+                        // Schedule a task to be executed after 90 seconds
+                        executorService.schedule(() -> {
+                            // This code will be executed after the timeout (30 seconds)
+                            System.out.println("No ack received within the timeout. Taking appropriate actions.");
+
+                            executorService.shutdown();
+                        }, 90, TimeUnit.SECONDS);
+
+                        PeriodicHeartBeatPacket recvPack;
+                        try {
+                            recvPack = (PeriodicHeartBeatPacket) objectInputStream.readObject();
+                            // If an ack is received before the timeout, cancel the scheduled task
+                            executorService.shutdownNow();
+                            System.out.println("Received: " + recvPack.getMessage());
+                        } catch (ClassNotFoundException e) {
+                            e.printStackTrace();
+                        } finally {
+                            // Make sure to shutdown the executor service in case of any exception
+                            executorService.shutdown();
+                        }
+
                     } catch (IOException e) {
+                        /*
+                         * handle head node going down here
+                         * */
+                        
+
                         e.printStackTrace();
                     }
                 }
@@ -170,11 +205,14 @@ public class ImageConsumer {
 
         Socket socket = null;
         ObjectOutputStream objectOutputStream = null;
+        ObjectInputStream objectInputStream = null;
 
         try {
 
             socket = new Socket(SERVER_HOST, SERVER_PORT);
             objectOutputStream = new ObjectOutputStream(socket.getOutputStream());
+            objectInputStream = new ObjectInputStream(socket.getInputStream());
+
             ProfilePacket packetToSend = new ProfilePacket(topicName, myFreeSpace, isSSD);
             objectOutputStream.writeObject(packetToSend);
 
@@ -183,11 +221,12 @@ public class ImageConsumer {
             BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             String message = reader.readLine();
             System.out.println("Received message from head node: " + message);
-            new PeriodicHeartBeatSender(socket, objectOutputStream).start();
+            new PeriodicHeartBeatSender(socket, objectOutputStream, objectInputStream).start();
 
             System.out.println("Periodic Heard Beat Sender thread started");
 
         } catch (IOException e) {
+            System.out.println("khfdskjfhsjkfh");
             e.printStackTrace();
         } finally {
 

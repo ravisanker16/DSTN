@@ -21,14 +21,29 @@ public class PeriodicHeartBeatPacket implements Serializable {
         this.writeSpeed = 0;
     }
 
+    public PeriodicHeartBeatPacket(String message) {
+        this.message = message;
+        this.memFreePerc = 0;
+        this.latestImagesReceieved = null;
+        this.readSpeed = 0;
+        this.writeSpeed = 0;
+    }
+
     public String getMessage() {
         return message;
     }
-    public Double getMemFreePerc(){ return memFreePerc; }
 
-    public Double getReadSpeed(){ return readSpeed; }
+    public Double getMemFreePerc() {
+        return memFreePerc;
+    }
 
-    public Double getWriteSpeed(){ return writeSpeed; }
+    public Double getReadSpeed() {
+        return readSpeed;
+    }
+
+    public Double getWriteSpeed() {
+        return writeSpeed;
+    }
 
     public List<String> getLatestImagesList() {
         return latestImagesReceieved;
@@ -80,6 +95,7 @@ public class PeriodicHeartBeatPacket implements Serializable {
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
         }
+        /*
         String readCommand = "dd if=helper/wikimedia_file.txt of=/dev/null bs=4M";
         String writeCommand = "dd if=/dev/zero of=helper/wikimedia_file_write.txt bs=4M count=1000";
 
@@ -107,6 +123,7 @@ public class PeriodicHeartBeatPacket implements Serializable {
 
 
     }
+
     private static Double executeCommand(String command) throws IOException {
         ProcessBuilder processBuilder = new ProcessBuilder(command.split("\\s+"));
         processBuilder.redirectErrorStream(true);
@@ -158,5 +175,7 @@ public class PeriodicHeartBeatPacket implements Serializable {
         }
 
         return GBPerSec;
+
+         */
     }
 }

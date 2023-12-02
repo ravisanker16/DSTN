@@ -99,7 +99,9 @@ public class HeadNode {
         }
 
         private static void handleClient(Socket clientSocket) {
-            try (ObjectInputStream objectInputStream = new ObjectInputStream(clientSocket.getInputStream())) {
+            try (ObjectInputStream objectInputStream = new ObjectInputStream(clientSocket.getInputStream());
+                 ObjectOutputStream objectOutputStream = new ObjectOutputStream(clientSocket.getOutputStream())) {
+
                 // Read the Packet object from the client
                 ProfilePacket packet = (ProfilePacket) objectInputStream.readObject();
                 int currentStorageNodeCount = storageNodeCount;
@@ -147,7 +149,9 @@ public class HeadNode {
                 topicNameToStorageNodeNumber.put(packet.getTopicName(), currentStorageNodeCount);
 
                 // Assuming 50% memory available and readWriteSpeed at 2 GB/s initially
-                maxHeapStorageSpace.add(new StorageNodeTuple(packet.getFreeSpace(), 0.0, 50.0, 2.0, packet.isSSD(), currentStorageNodeCount));
+                maxHeapStorageSpace.add(new
+
+                        StorageNodeTuple(packet.getFreeSpace(), 0.0, 50.0, 2.0, packet.isSSD(), currentStorageNodeCount));
 
 
                 System.out.println("storage node number to topic name: " + storageNodeNumberToTopicName);
@@ -166,9 +170,15 @@ public class HeadNode {
                              * Invalidate if not received within 1 min 5 s
                              * */
                             System.out.println("Waiting for Hearbeat signal from storage node " + currentStorageNodeCount);
+
                             PeriodicHeartBeatPacket recvpacket = (PeriodicHeartBeatPacket) objectInputStream.readObject();
-                            updatePriorityQueue(currentStorageNodeCount, recvpacket);
                             System.out.println("Received periodic heartbeat message from storage node " + currentStorageNodeCount + ": " + recvpacket.getMessage());
+
+                            PeriodicHeartBeatPacket ackPacket = new PeriodicHeartBeatPacket("ack");
+                            objectOutputStream.writeObject(ackPacket);
+                            System.out.println("Sent ack");
+
+                            updatePriorityQueue(currentStorageNodeCount, recvpacket);
                             System.out.println(recvpacket.getLatestImagesList().size() + " images received by " + currentStorageNodeCount);
 
                             for (String imgName : recvpacket.getLatestImagesList()) {
@@ -182,12 +192,14 @@ public class HeadNode {
                     });
                     future.get(1000, TimeUnit.SECONDS);
 
-                } catch (TimeoutException e) {
+                } catch (
+                        TimeoutException e) {
                     System.out.println("Timeout occurred. Exiting the loop. Storage node numbe: " + currentStorageNodeCount);
                     System.out.println("Invalidating storage node number: " + currentStorageNodeCount);
                     validityStorageNode.put(currentStorageNodeCount, false);
 
-                } catch (InterruptedException | ExecutionException e) {
+                } catch (InterruptedException |
+                        ExecutionException e) {
                     System.out.println("Something went wrong with storage node number: " + currentStorageNodeCount);
                     System.out.println("Invalidating storage node number: " + currentStorageNodeCount);
                     validityStorageNode.put(currentStorageNodeCount, false);
