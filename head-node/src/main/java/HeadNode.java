@@ -74,7 +74,7 @@ public class HeadNode {
             }
         }
 
-        public static StorageNodeTuple pollFromPriorityQueue(int storageNode){
+        public static StorageNodeTuple pollFromPriorityQueue(int storageNode) {
             Iterator<StorageNodeTuple> iterator = maxHeapStorageSpace.iterator();
 
             while (iterator.hasNext()) {
@@ -87,15 +87,17 @@ public class HeadNode {
 
             return null; // Element not found
         }
-        public static void updatePriorityQueue(int currentStorageNodeCount, PeriodicHeartBeatPacket recvPacket){
+
+        public static void updatePriorityQueue(int currentStorageNodeCount, PeriodicHeartBeatPacket recvPacket) {
             StorageNodeTuple removeTuple = pollFromPriorityQueue(currentStorageNodeCount);
-            if(removeTuple == null){
+            if (removeTuple == null) {
                 System.out.println("Periodic Removal Tuple for node: " + currentStorageNodeCount + "not Found!!!");
                 return;
             }
-            StorageNodeTuple updatedTuple = new StorageNodeTuple(removeTuple.getStorageSpace(), removeTuple.getBytesSent(), recvPacket.getMemFreePerc(), (recvPacket.getReadSpeed()+recvPacket.getWriteSpeed())/2.0, removeTuple.isSSD(), removeTuple.getStorageNodeNumber());
+            StorageNodeTuple updatedTuple = new StorageNodeTuple(removeTuple.getStorageSpace(), removeTuple.getBytesSent(), recvPacket.getMemFreePerc(), (recvPacket.getReadSpeed() + recvPacket.getWriteSpeed()) / 2.0, removeTuple.isSSD(), removeTuple.getStorageNodeNumber());
             maxHeapStorageSpace.add(updatedTuple);
         }
+
         private static void handleClient(Socket clientSocket) {
             try (ObjectInputStream objectInputStream = new ObjectInputStream(clientSocket.getInputStream())) {
                 // Read the Packet object from the client
@@ -171,8 +173,9 @@ public class HeadNode {
 
                             for (String imgName : recvpacket.getLatestImagesList()) {
                                 System.out.println("Image " + imgName + "received by storage node " + currentStorageNodeCount);
-                                updateMetaData(imgName, currentStorageNodeCount);
+                                locationMap.put(imgName, currentStorageNodeCount);
                             }
+                            updateMetaData();
 
                         }
 
@@ -199,11 +202,7 @@ public class HeadNode {
             }
         }
 
-        public static void updateMetaData(String imgName, int storageNodeNumber) {
-            // updating the hashmap with the storage node the message got assigned to
-            // this is essentially the metadata
-            locationMap.put(imgName, storageNodeNumber);
-
+        public static void updateMetaData() {
             // writing the meta data to a file
             ObjectMapper mapper = new ObjectMapper();
             try {
@@ -558,6 +557,15 @@ public class HeadNode {
                         return;
                     }
                     StorageNodeTuple topTuple = maxHeapStorageSpace.poll();
+                    int nodeNumber = topTuple.getStorageNodeNumber();
+                    while (!validityStorageNode.containsKey(nodeNumber) || !validityStorageNode.get(nodeNumber)) {
+                        if (maxHeapStorageSpace.isEmpty()) {
+                            System.out.println("Too few nodes are alive. Exiting.");
+                            return;
+                        }
+                        topTuple = maxHeapStorageSpace.poll();
+                        nodeNumber = topTuple.getStorageNodeNumber();
+                    }
                     String topicToSendTo = storageNodeNumberToTopicName.get(topTuple.getStorageNodeNumber());
 
                     log.info("Received message: Key - " + record.key());
@@ -593,6 +601,16 @@ public class HeadNode {
                     }
 
                     StorageNodeTuple topTupleForBackup = maxHeapStorageSpace.poll();
+                    int nodeNumberForBackup = topTupleForBackup.getStorageNodeNumber();
+                    while (!validityStorageNode.containsKey(nodeNumberForBackup) || !validityStorageNode.get(nodeNumberForBackup)) {
+                        if (maxHeapStorageSpace.isEmpty()) {
+                            System.out.println("Too few nodes are alive. Exiting.");
+                            return;
+                        }
+                        topTupleForBackup = maxHeapStorageSpace.poll();
+                        nodeNumberForBackup = topTupleForBackup.getStorageNodeNumber();
+                    }
+
                     String topicToSendBackupTo = storageNodeNumberToTopicName.get(topTupleForBackup.getStorageNodeNumber());
                     producerRecord = new ProducerRecord<>(topicToSendBackupTo, "backup_" + path, imageData);
                     System.out.println("Sending backup image " + path + " to topic " + topicToSendBackupTo);
