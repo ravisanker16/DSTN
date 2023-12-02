@@ -1,3 +1,4 @@
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -9,15 +10,12 @@ import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
@@ -95,9 +93,11 @@ public class HeadNode {
 
                         if (packet.getFirstTime() == false) {
                             validityStorageNode.put(topicNameToStorageNodeNumber.get(packet.getTopicName()), true);
-                            writer.println("Topic exists. You have been validated");
+                            writer.println("Ah! Welcome Again! Topic exists. You have been validated");
+                            System.out.println("Ah! Welcome Again! Topic exists. You have been validated");
                         } else {
                             writer.println("Topic already exists! Choose another topic name.");
+                            System.out.println("Topic already exists! Choose another topic name");
                         }
 
                     } catch (IOException e) {
@@ -132,7 +132,7 @@ public class HeadNode {
                 ExecutorService executorService = Executors.newSingleThreadExecutor();
 
                 try {
-                    // Execute the blocking task with a timeout of 1 minute and 5 seconds
+                    // Execute the blocking task with a timeout of 1 minute and 90 seconds
                     Future<Void> future = executorService.submit(() -> {
 
                         while (true) {
@@ -154,10 +154,10 @@ public class HeadNode {
                         }
 
                     });
-                    future.get(65, TimeUnit.SECONDS);
+                    future.get(1000, TimeUnit.SECONDS);
 
                 } catch (TimeoutException e) {
-                    System.out.println("Timeout occurred. Exiting the loop.");
+                    System.out.println("Timeout occurred. Exiting the loop. Storage node numbe: " + currentStorageNodeCount);
                     System.out.println("Invalidating storage node number: " + currentStorageNodeCount);
                     validityStorageNode.put(currentStorageNodeCount, false);
 
@@ -230,7 +230,7 @@ public class HeadNode {
      * */
     static class ImageRequestLookout extends Thread {
 
-        private static String metaDataFileName = "metadata.json";
+        private static String metaDataFileName = "/Users/ravisanker/Documents/Acads/Academics_4_1/DSTN/Project/meta/metadata.json";
 
         public ImageRequestLookout() {
 
@@ -312,23 +312,61 @@ public class HeadNode {
         // Function to find the value for a given key in a JSON file
         private static int findValueForKey(String fileName, StringBuilder keyToFind) throws Exception {
             // Read the JSON file content into a string
-            String content = new String(Files.readAllBytes(Paths.get(fileName)));
+//            String content = new String(Files.readAllBytes(Paths.get(fileName)));
+//            JSONObject json = new JSONObject(content);
+//            if (json.has(keyToFind.toString()) &&
+//                    validityStorageNode.containsKey(json.getInt(keyToFind.toString())) &&
+//                    validityStorageNode.get(json.getInt(keyToFind.toString()))) {
+//                // Retrieve the integer value associated with the key
+//                return json.getInt(keyToFind.toString());
+//            } else {
+//                keyToFind.insert(0, "backup_");
+//                if (json.has(keyToFind.toString()) &&
+//                        validityStorageNode.containsKey(json.getInt(keyToFind.toString()))
+//                        && validityStorageNode.get(json.getInt(keyToFind.toString()))) {
+//                    return json.getInt(keyToFind.toString());
+//                }
+//                return Integer.MIN_VALUE; // Key not found or not an integer
+//            }
 
-            // Parse the JSON string into a JSONObject
-            JSONObject json = new JSONObject(content);
+            try {
+                ObjectMapper objectMapper = new ObjectMapper();
+                JsonNode jsonNode = objectMapper.readTree(new File(fileName));
 
+                // Replace "yourKey" with the actual key you want to retrieve
+                String keyToRetrieve = keyToFind.toString();
 
-            // Check if the key exists in the JSON object
-            if (json.has(keyToFind.toString()) && validityStorageNode.get(json.getInt(keyToFind.toString()))) {
-                // Retrieve the integer value associated with the key
-                return json.getInt(keyToFind.toString());
-            } else {
-                keyToFind.insert(0, "backup_");
-                if (json.has(keyToFind.toString()) && validityStorageNode.get(json.getInt(keyToFind.toString()))) {
-                    return json.getInt(keyToFind.toString());
+                // Check if the key is present before retrieving the value
+                if (jsonNode.has(keyToRetrieve)) {
+
+                    int value = Integer.parseInt(jsonNode.get(keyToRetrieve).asText());
+//                    return value;
+                    System.out.println("actual: " + value + "present in map? " + validityStorageNode.containsKey(value));
+                    if (validityStorageNode.containsKey(value))
+                        System.out.println("actual: " + value + "is valid? " + validityStorageNode.get(value));
+                    if (validityStorageNode.containsKey(value) && validityStorageNode.get(value))
+                        return value;
                 }
-                return Integer.MIN_VALUE; // Key not found or not an integer
+                keyToFind.insert(0, "backup_");
+                keyToRetrieve = keyToFind.toString();
+                if (jsonNode.has(keyToRetrieve)) {
+
+                    int value = Integer.parseInt(jsonNode.get(keyToRetrieve).asText());
+//                    return value;
+                    System.out.println("backup: " + value + "present in map? " + validityStorageNode.containsKey(value));
+                    if (validityStorageNode.containsKey(value))
+                        System.out.println("backup: " + value + "is valid? " + validityStorageNode.get(value));
+
+                    if (validityStorageNode.containsKey(value) && validityStorageNode.get(value))
+                        return value;
+                }
+
+
+            } catch (IOException e) {
+                e.printStackTrace();
             }
+
+            return Integer.MIN_VALUE;
         }
 
         private static void fetchImageHandler() {
@@ -458,6 +496,8 @@ public class HeadNode {
         StorageNodeLookout storageNodeLookout = new StorageNodeLookout();
         storageNodeLookout.start();
 
+        ImageRequestLookout imageRequestLookout = new ImageRequestLookout();
+        imageRequestLookout.start();
 
         /*
         Thread threadPingAck = new Thread(new PingAck());

@@ -11,7 +11,7 @@ import java.util.Properties;
 
 public class ImageRequester {
     public static void main(String[] args) {
-        String filePath = "/Users/ravisanker/Documents/Acads/Academics_4_1/DSTN/Project/imgSent/";
+        String filePath = "/Users/ravisanker/Documents/Acads/Academics_4_1/DSTN/Project/imgSent/img.txt";
         Path path = Paths.get(filePath);
 
         try (BufferedReader reader = Files.newBufferedReader(path)) {
@@ -29,8 +29,9 @@ public class ImageRequester {
 
                 // create a Producer Record
                 String topic = "request-topic";
-                String value = line;
-                ProducerRecord<String, String> producerRecord = new ProducerRecord<>(topic, value);
+                String key = new String(line);
+                String value = new String(line);
+                ProducerRecord<String, String> producerRecord = new ProducerRecord<>(topic, line, value);
 
                 producer.send(producerRecord);
                 producer.flush();

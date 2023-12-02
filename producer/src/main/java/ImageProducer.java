@@ -22,7 +22,7 @@ public class ImageProducer {
         log.info("Image Produce");
         ReadFiles.addFileNames(10);
         List<String> imgName = ReadFiles.getFileNamesList();
-        writeListToFile(imgName, "/Users/ravisanker/Documents/Acads/Academics_4_1/DSTN/Project/imgSent/");
+        writeListToFile(imgName, "/Users/ravisanker/Documents/Acads/Academics_4_1/DSTN/Project/imgSent/img.txt");
 
         for (int i = 0; i < imgName.size(); i++) {
             String path = "/Users/ravisanker/Desktop/row_wise/" + imgName.get(i);

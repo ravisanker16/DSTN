@@ -33,7 +33,7 @@ class StorageNodeTuple implements Comparable<StorageNodeTuple> {
     // Implement compareTo method for Comparable interface
     @Override
     public int compareTo(StorageNodeTuple other) {
-        return Double.compare(totWeightNode, other.totWeightNode); // Reverse order for max heap
+        return Double.compare(other.totWeightNode, totWeightNode); // Reverse order for max heap
     }
 
     // Add getters if needed
